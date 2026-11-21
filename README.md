@@ -15,10 +15,10 @@ Especificação: `Especificacao_Treinador_Poker_Cash_Game.md` (v1.0). Decisões:
 | Persistência após fechar e reabrir | **Executado** (E2E no app instalado) |
 | Instalador NSIS por usuário | **Executado** nesta máquina (Windows 11 Pro) |
 | Updater 0.1.0 → 0.1.1 com feed local e chave dev, incl. falhas | **Executado** (11/11 checks) |
-| CI (`ci.yml`) e release (`release.yml`) no GitHub | **Executado** (releases v0.1.0, v0.2.0 e v0.3.0 publicadas) |
+| CI (`ci.yml`) e release (`release.yml`) no GitHub | **Executado** (releases v0.1.0 a v0.3.1 publicadas) |
 | Teste em VM Windows 11 limpa, SmartScreen, Authenticode | **Pendente** |
-| Publicação com chave de produção e feed `dgnnj/pokerlab-solver` | **Executado** (v0.3.0 é a Latest; `latest.json` assinado e verificado contra a chave pública de produção) |
-| Simulação de mão completa (flop ao river contra a política do motor), árvore do flop resolvida no app | **Executado** no build release (E2E via WebView2: 9h6h3h como BB e 8s7s5d como BTN, 3 mãos cada, histórico após reabrir); publicada na v0.3.0 (E2E rodou no build release, não no instalador baixado do feed) |
+| Publicação com chave de produção e feed `dgnnj/pokerlab-solver` | **Executado** (v0.3.1 é a Latest; `latest.json` assinado e verificado contra a chave pública de produção) |
+| Simulação de mão completa (flop ao river contra a política do motor), árvore do flop resolvida no app | **Executado** no build release (E2E via WebView2: 9h6h3h como BB e 8s7s5d como BTN, 3 mãos cada, histórico após reabrir); publicada na v0.3.0; exportação das mãos em CSV publicada na v0.3.1 (E2E rodou no build release, não no instalador baixado do feed) |
 
 ## Pré-requisitos
 
