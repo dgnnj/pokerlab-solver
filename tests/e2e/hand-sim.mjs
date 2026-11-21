@@ -154,6 +154,26 @@ const totalSteps = played.reduce((a, p) => a + p.steps, 0);
 if (!exportMsg.startsWith(`${hands} mãos`)) fail(`export: ${exportMsg}`);
 if (csvLines.length !== totalSteps + 1) fail(`CSV com ${csvLines.length - 1} linhas (esperado ${totalSteps})`);
 if (!csvLines[0].startsWith("hand_id,")) fail(`cabeçalho do CSV: ${csvLines[0]}`);
+
+// Review of a past hand (most recent row = last hand played): same decisions and cards as shown.
+async function checkReview(label) {
+  const last = played[played.length - 1];
+  await page.getByRole("button", { name: /^Rever mão / }).first().click();
+  await page.getByRole("heading", { name: "Revisão da mão" }).waitFor();
+  const reviews = await page.locator(".decision-review summary").allInnerTexts();
+  const villainShown = (await page.locator(".villain .card:not(.card-back)").count()) === 2;
+  const boardCards = await page.locator(".board .card").count();
+  const result = await page.locator(".result-hero, .result-villain, .result-split").first().innerText();
+  log(`revisão (${label}): ${reviews.length} decisões, board ${boardCards} cartas, ${result.split("\n")[0]}`);
+  if (JSON.stringify(reviews) !== JSON.stringify(last.reviews)) fail(`revisão (${label}) difere das decisões jogadas`);
+  if (!villainShown) fail(`revisão (${label}) sem as cartas do adversário`);
+  if (boardCards !== last.boardCards) fail(`revisão (${label}): board com ${boardCards} cartas`);
+  if (result.split("\n")[0] !== last.result) fail(`revisão (${label}): resultado "${result.split("\n")[0]}"`);
+  await page.screenshot({ path: path.join(shots, `07-revisao-${label}.png`), fullPage: true });
+  await page.getByRole("button", { name: "Voltar" }).click();
+  await page.getByRole("heading", { name: "Histórico de mãos" }).waitFor();
+}
+await checkReview("mesma-sessao");
 await browser.close();
 await shutdown(child);
 log("app fechado");
@@ -168,6 +188,7 @@ await page.locator("table tbody tr").first().waitFor();
 const rows2 = await page.locator("table tbody tr").allInnerTexts();
 const finished = await page.locator(".stat .stat-v").first().innerText();
 await page.screenshot({ path: path.join(shots, "06-historico-apos-reabrir.png"), fullPage: true });
+await checkReview("apos-reabrir");
 await browser.close();
 await shutdown(child);
 

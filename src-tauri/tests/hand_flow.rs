@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 
 use poker_core::spot::SpotConfig;
 use pokerlab_lib::db::Db;
-use pokerlab_lib::handplay::{export_csv, history, BoardSource, EngineStatus, HandEngine};
+use pokerlab_lib::handplay::{export_csv, history, review, BoardSource, EngineStatus, HandEngine};
 
 fn source(name: &str, id: &str) -> BoardSource {
     let p = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(format!("../data/spots/{name}"));
@@ -185,6 +185,47 @@ fn hands_are_played_against_the_engine_and_persisted() {
             .sum();
         assert!((sum - v.summary.total_loss_bb).abs() < 1e-6);
     }
+
+    // Review of past hands from the database (after reopening, engine not needed).
+    let cpb = |_: &str| Some(1.0);
+    let id_of = |token: &str| -> i64 {
+        db.conn
+            .query_row("SELECT id FROM hands WHERE token = ?1", [token], |r| {
+                r.get(0)
+            })
+            .unwrap()
+    };
+    for v in &finished {
+        let rv = review(&db, id_of(&v.token), cpb).unwrap();
+        assert!(rv.row.ended_at.is_some());
+        let snap = rv.view.expect("instantâneo gravado");
+        // The snapshot is exactly the final view the student saw.
+        let shown: serde_json::Value =
+            serde_json::from_str(&serde_json::to_string(v).unwrap()).unwrap();
+        assert_eq!(snap, shown);
+        assert_eq!(rv.decisions.len(), v.decisions.len());
+        for (s, d) in rv.decisions.iter().zip(&v.decisions) {
+            assert_eq!(s.chosen_label, d.chosen_label);
+            assert_eq!(s.grade.is_some(), d.feedback.is_some());
+            assert!(s.pot_bb.is_some());
+        }
+    }
+    let rv = review(&db, id_of(&interrupted.token), cpb).unwrap();
+    assert!(rv.row.ended_at.is_none() && rv.decisions.is_empty());
+    assert_eq!(rv.view.unwrap()["finished"], false);
+    // Hands played before snapshots existed: stored decisions only; unknown spot = no bb amounts.
+    let legacy = &finished[0];
+    db.conn
+        .execute(
+            "UPDATE hands SET view_json = NULL WHERE token = ?1",
+            [&legacy.token],
+        )
+        .unwrap();
+    let rv = review(&db, id_of(&legacy.token), |_| None).unwrap();
+    assert!(rv.view.is_none());
+    assert_eq!(rv.decisions.len(), legacy.decisions.len());
+    assert!(rv.decisions.iter().all(|d| d.pot_bb.is_none()));
+    assert!(review(&db, 9999, cpb).is_err());
 }
 
 /// Minimal RFC 4180 field splitter for one line (no embedded newlines in this export).

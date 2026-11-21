@@ -332,6 +332,18 @@ fn hand_history(state: State<AppState>, limit: Option<i64>) -> CmdResult<handpla
 }
 
 #[tauri::command]
+fn hand_review(state: State<AppState>, id: i64) -> CmdResult<handplay::HandReview> {
+    with_trainer(&state, |t| {
+        handplay::review(&t.db, id, |sid| {
+            t.pack
+                .solutions
+                .get(sid)
+                .map(|s| s.spot.chips_per_bb as f64)
+        })
+    })
+}
+
+#[tauri::command]
 fn export_hands_csv(state: State<AppState>) -> CmdResult<String> {
     let path = state
         .data_dir
@@ -467,6 +479,7 @@ pub fn run() {
             hand_act,
             hand_view,
             hand_history,
+            hand_review,
             export_hands_csv,
             updater::check_update,
             updater::install_update,

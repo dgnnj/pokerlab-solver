@@ -310,7 +310,7 @@ impl HandEngine {
             r.hands.insert(token.clone(), ActiveHand { sim, started_at });
             // Same path as `act`, in case the hand ended before the hero's first decision.
             finalize_if_done(db, r, &token)?;
-            view(r, &token)
+            snapshot(db, r, &token)
         })
     }
 
@@ -340,7 +340,7 @@ impl HandEngine {
             insert_decision(db, token, &d, decision_ms.unwrap_or(0))?;
             h.sim.advance(game, &src.spot, rng, &mut engine_policy)?;
             finalize_if_done(db, r, token)?;
-            view(r, token)
+            snapshot(db, r, token)
         })
     }
 
@@ -355,6 +355,18 @@ impl HandEngine {
             Ok(())
         })
     }
+}
+
+/// Builds the view and stores it as the hand's snapshot (reviewed later from the history).
+fn snapshot(db: &Db, r: &mut Ready, token: &str) -> R<HandView> {
+    let v = view(r, token)?;
+    let json = serde_json::to_string(&v)
+        .map_err(|e| TrainerError::Msg(format!("instantâneo da mão: {e}")))?;
+    db.conn.execute(
+        "UPDATE hands SET view_json = ?2 WHERE token = ?1",
+        params![token, json],
+    )?;
+    Ok(v)
 }
 
 fn position(spot: &SpotConfig, player: usize) -> String {
@@ -730,6 +742,8 @@ pub struct HandRow {
     pub total_loss_bb: f64,
     pub cut_reason: Option<String>,
     pub pack_version: String,
+    pub solution_id: String,
+    pub villain_position: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -788,34 +802,41 @@ fn stats(db: &Db, filter: &str, args: &[&dyn rusqlite::ToSql]) -> R<HandStats> {
     })
 }
 
+const HAND_ROW_COLUMNS: &str =
+    "id, started_at, ended_at, hero_position, hero_combo, villain_combo, flop,
+    final_board, line, winner, showdown, hero_net_bb, decisions, graded, total_loss_bb, cut_reason,
+    pack_version, solution_id, villain_position";
+
+fn map_hand_row(r: &rusqlite::Row) -> rusqlite::Result<HandRow> {
+    Ok(HandRow {
+        id: r.get(0)?,
+        started_at: r.get(1)?,
+        ended_at: r.get(2)?,
+        hero_position: r.get(3)?,
+        hero_combo: r.get(4)?,
+        villain_combo: r.get(5)?,
+        flop: r.get(6)?,
+        final_board: r.get(7)?,
+        line: r.get(8)?,
+        winner: r.get(9)?,
+        showdown: r.get(10)?,
+        hero_net_bb: r.get(11)?,
+        decisions: r.get(12)?,
+        graded: r.get(13)?,
+        total_loss_bb: r.get(14)?,
+        cut_reason: r.get(15)?,
+        pack_version: r.get(16)?,
+        solution_id: r.get(17)?,
+        villain_position: r.get(18)?,
+    })
+}
+
 pub fn history(db: &Db, limit: i64) -> R<HandHistory> {
-    let mut st = db.conn.prepare(
-        "SELECT id, started_at, ended_at, hero_position, hero_combo, villain_combo, flop, final_board, line,
-                winner, showdown, hero_net_bb, decisions, graded, total_loss_bb, cut_reason, pack_version
-         FROM hands ORDER BY id DESC LIMIT ?1",
-    )?;
+    let mut st = db.conn.prepare(&format!(
+        "SELECT {HAND_ROW_COLUMNS} FROM hands ORDER BY id DESC LIMIT ?1"
+    ))?;
     let recent = st
-        .query_map([limit], |r| {
-            Ok(HandRow {
-                id: r.get(0)?,
-                started_at: r.get(1)?,
-                ended_at: r.get(2)?,
-                hero_position: r.get(3)?,
-                hero_combo: r.get(4)?,
-                villain_combo: r.get(5)?,
-                flop: r.get(6)?,
-                final_board: r.get(7)?,
-                line: r.get(8)?,
-                winner: r.get(9)?,
-                showdown: r.get(10)?,
-                hero_net_bb: r.get(11)?,
-                decisions: r.get(12)?,
-                graded: r.get(13)?,
-                total_loss_bb: r.get(14)?,
-                cut_reason: r.get(15)?,
-                pack_version: r.get(16)?,
-            })
-        })?
+        .query_map([limit], map_hand_row)?
         .collect::<Result<Vec<_>, _>>()?;
     let mut by_position = Vec::new();
     let mut pst = db
@@ -896,4 +917,91 @@ pub fn export_csv(db: &Db, path: &std::path::Path) -> R<(usize, usize)> {
         .query_row("SELECT COUNT(*) FROM hands", [], |r| r.get(0))?;
     poker_core::solution::write_atomic(path, out.as_bytes())?;
     Ok((hands as usize, rows))
+}
+
+/// A decision as stored in `hand_decisions` (always available, also for hands played before
+/// snapshots existed). Chip amounts are converted to bb when the spot is known.
+#[derive(Debug, Clone, Serialize)]
+pub struct StoredDecision {
+    pub seq: i64,
+    pub street: String,
+    pub board: String,
+    pub pot_bb: Option<f64>,
+    pub chosen_label: String,
+    pub best_label: Option<String>,
+    pub best_ev_bb: Option<f64>,
+    pub chosen_ev_bb: Option<f64>,
+    pub loss_bb: Option<f64>,
+    pub loss_pct_pot: Option<f64>,
+    pub grade: Option<String>,
+    pub chosen_frequency: Option<f64>,
+    pub equity: Option<f64>,
+    pub not_evaluable: Option<String>,
+}
+
+/// A past hand for review: the stored row and decisions, plus the snapshot of the view as it was
+/// shown (absent for hands played before schema v3). The snapshot of an interrupted hand is its
+/// state at the last decision; the villain's cards come from the row.
+#[derive(Debug, Clone, Serialize)]
+pub struct HandReview {
+    pub row: HandRow,
+    pub view: Option<serde_json::Value>,
+    pub decisions: Vec<StoredDecision>,
+}
+
+/// Loads hand `id` for review. `chips_per_bb` maps a solution id to its spot's chips per bb
+/// (None when the solution is no longer in the installed pack; amounts in bb are then omitted).
+pub fn review(db: &Db, id: i64, chips_per_bb: impl Fn(&str) -> Option<f64>) -> R<HandReview> {
+    let (row, view_json): (HandRow, Option<String>) = db
+        .conn
+        .query_row(
+            &format!("SELECT {HAND_ROW_COLUMNS}, view_json FROM hands WHERE id = ?1"),
+            [id],
+            |r| Ok((map_hand_row(r)?, r.get(19)?)),
+        )
+        .map_err(|e| match e {
+            rusqlite::Error::QueryReturnedNoRows => {
+                TrainerError::Msg(format!("mão {id} não encontrada"))
+            }
+            e => e.into(),
+        })?;
+    let view = match view_json {
+        Some(s) => Some(
+            serde_json::from_str(&s)
+                .map_err(|e| TrainerError::Msg(format!("instantâneo da mão {id} ilegível: {e}")))?,
+        ),
+        None => None,
+    };
+    let cpb = chips_per_bb(&row.solution_id);
+    let to_bb = |c: Option<f64>| c.and_then(|c| cpb.map(|k| c / k));
+    let mut st = db.conn.prepare(
+        "SELECT seq, street, board, pot_chips, chosen_label, best_label, best_ev_chips, chosen_ev_chips,
+                loss_bb, loss_pct_pot, grade, chosen_frequency, equity, not_evaluable
+         FROM hand_decisions WHERE hand_id = ?1 ORDER BY seq",
+    )?;
+    let decisions = st
+        .query_map([id], |r| {
+            Ok(StoredDecision {
+                seq: r.get(0)?,
+                street: r.get(1)?,
+                board: r.get(2)?,
+                pot_bb: to_bb(r.get::<_, Option<f64>>(3)?),
+                chosen_label: r.get(4)?,
+                best_label: r.get(5)?,
+                best_ev_bb: to_bb(r.get(6)?),
+                chosen_ev_bb: to_bb(r.get(7)?),
+                loss_bb: r.get(8)?,
+                loss_pct_pot: r.get(9)?,
+                grade: r.get(10)?,
+                chosen_frequency: r.get(11)?,
+                equity: r.get(12)?,
+                not_evaluable: r.get(13)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(HandReview {
+        row,
+        view,
+        decisions,
+    })
 }

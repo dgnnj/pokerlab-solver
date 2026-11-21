@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::Serialize;
 
-pub const SCHEMA_VERSION: i64 = 2;
+pub const SCHEMA_VERSION: i64 = 3;
 
 /// Migrations indexed by target version. Never edit a released migration; append a new one.
 const MIGRATIONS: &[(i64, &str)] = &[
@@ -150,6 +150,15 @@ CREATE TABLE hand_decisions (
     UNIQUE (hand_id, seq)
 );
 CREATE INDEX hand_decisions_hand ON hand_decisions(hand_id);
+"#,
+    ),
+    (
+        3,
+        r#"
+-- Snapshot of the hand as shown to the student (JSON of HandView), rewritten after each
+-- decision, so a past hand can be reviewed exactly as it was played. NULL for hands played
+-- before this migration.
+ALTER TABLE hands ADD COLUMN view_json TEXT;
 "#,
     ),
 ];
@@ -384,7 +393,7 @@ mod tests {
     }
 
     #[test]
-    fn v1_database_migrates_to_v2_with_backup() {
+    fn v1_database_migrates_to_current_with_backup() {
         let dir = tempfile::tempdir().unwrap();
         let p = dir.path().join("t.sqlite3");
         {
@@ -395,7 +404,7 @@ mod tests {
                 .unwrap();
         }
         let db = Db::open(&p).unwrap();
-        assert_eq!(db.schema_version().unwrap(), 2);
+        assert_eq!(db.schema_version().unwrap(), SCHEMA_VERSION);
         assert_eq!(db.get_pref("k").unwrap().as_deref(), Some("v1"));
         let n: i64 = db
             .conn
@@ -410,6 +419,36 @@ mod tests {
             backups.iter().any(|b| b.contains("pre-migracao-v1")),
             "{backups:?}"
         );
+    }
+
+    #[test]
+    fn v2_hands_survive_migration_to_v3_without_snapshot() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("t.sqlite3");
+        {
+            let c = Connection::open(&p).unwrap();
+            c.execute_batch(MIGRATIONS[0].1).unwrap();
+            c.execute_batch(MIGRATIONS[1].1).unwrap();
+            c.pragma_update(None, "user_version", 2).unwrap();
+            c.execute(
+                "INSERT INTO hands(token, started_at, solution_id, config_hash, same_config_as_pack, pack_id,
+                    pack_version, engine_rev, solve_exploitability_pct, hero_position, villain_position,
+                    hero_combo, villain_combo, flop)
+                 VALUES ('t', 'x', 's', 'h', 1, 'p', '1', 'e', 0.4, 'BB', 'BTN', 'AhKh', 'QdQc', '9h6h3h')",
+                [],
+            )
+            .unwrap();
+        }
+        let db = Db::open(&p).unwrap();
+        assert_eq!(db.schema_version().unwrap(), 3);
+        let (combo, view): (String, Option<String>) = db
+            .conn
+            .query_row("SELECT hero_combo, view_json FROM hands", [], |r| {
+                Ok((r.get(0)?, r.get(1)?))
+            })
+            .unwrap();
+        assert_eq!(combo, "AhKh");
+        assert!(view.is_none());
     }
 
     #[test]

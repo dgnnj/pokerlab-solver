@@ -1,5 +1,9 @@
 # Changelog
 
+## Não lançado
+- Rever mãos antigas: botão "Rever" no histórico de mãos abre a mão como foi jogada (mesa, ação, resultado, nota e explicação de cada decisão), sem resolver o board de novo. Mãos interrompidas mostram o estado na última decisão.
+- Banco schema v3 (migração com backup automático): instantâneo de cada mão em `hands.view_json`. Mãos jogadas até a v0.3.1 aparecem na revisão só com os dados gravados de cada decisão.
+
 ## 0.3.1 — 2026-11-21
 - Exportar mãos completas (CSV): uma linha por decisão, com os dados da mão (cartas, board, linha, resultado) e a avaliação de cada decisão. Botão no histórico de mãos e em Configurações.
 - Correção: o motivo de corte da nota na mão completa mostrava "frequência acumulada 0.000000%"; agora diz "abaixo de 0,001%" (o limite real).

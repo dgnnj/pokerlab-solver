@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-hand-review"
+description = "Enables the hand_review command without any pre-configured scope."
+commands.allow = ["hand_review"]
+
+[[permission]]
+identifier = "deny-hand-review"
+description = "Denies the hand_review command without any pre-configured scope."
+commands.deny = ["hand_review"]
