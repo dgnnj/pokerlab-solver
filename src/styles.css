@@ -166,3 +166,16 @@ fieldset { border: 1px solid #3a4a4f; border-radius: 8px; }
 @media (max-width: 1100px) {
   .study-body { grid-template-columns: 1fr; }
 }
+
+/* Full hand */
+.card-back { background: repeating-linear-gradient(45deg, #7b2230, #7b2230 4px, #9b2f3f 4px, #9b2f3f 8px); border: 2px solid #f7f5ef; }
+.hand-log { display: flex; flex-direction: column; gap: 0.25rem; }
+.decision-review { background: var(--panel); border-radius: 8px; padding: 0.5rem 0.9rem; margin: 0.5rem 0; }
+.decision-review summary { cursor: pointer; }
+.decision-review .feedback { margin-top: 0.6rem; }
+.decision-review summary .grade-best { color: var(--ok); }
+.decision-review summary .grade-close { color: var(--close); }
+.decision-review summary .grade-inaccuracy { color: var(--warn); }
+.decision-review summary .grade-mistake { color: var(--bad); }
+.result-hero { border-color: var(--ok); }
+.result-villain { border-color: var(--bad); }

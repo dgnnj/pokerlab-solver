@@ -3050,6 +3050,7 @@ dependencies = [
  "rusqlite",
  "serde",
  "serde_json",
+ "solver-adapter",
  "tauri",
  "tauri-build",
  "tauri-plugin-single-instance",

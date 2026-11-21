@@ -5,12 +5,13 @@ use std::path::{Path, PathBuf};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::Serialize;
 
-pub const SCHEMA_VERSION: i64 = 1;
+pub const SCHEMA_VERSION: i64 = 2;
 
 /// Migrations indexed by target version. Never edit a released migration; append a new one.
-const MIGRATIONS: &[(i64, &str)] = &[(
-    1,
-    r#"
+const MIGRATIONS: &[(i64, &str)] = &[
+    (
+        1,
+        r#"
 CREATE TABLE packs (
     pack_id TEXT NOT NULL,
     version TEXT NOT NULL,
@@ -91,7 +92,67 @@ CREATE TABLE preferences (
     value TEXT NOT NULL
 );
 "#,
-)];
+    ),
+    (
+        2,
+        r#"
+-- Full hands simulated against the engine policy (flop to river).
+CREATE TABLE hands (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    token TEXT NOT NULL UNIQUE,
+    started_at TEXT NOT NULL,
+    ended_at TEXT,                 -- NULL = interrupted
+    solution_id TEXT NOT NULL,
+    config_hash TEXT NOT NULL,
+    same_config_as_pack INTEGER NOT NULL,
+    pack_id TEXT NOT NULL,
+    pack_version TEXT NOT NULL,
+    engine_rev TEXT NOT NULL,
+    solve_exploitability_pct REAL NOT NULL,
+    hero_position TEXT NOT NULL,
+    villain_position TEXT NOT NULL,
+    hero_combo TEXT NOT NULL,
+    villain_combo TEXT NOT NULL,
+    flop TEXT NOT NULL,
+    final_board TEXT,
+    line TEXT,
+    showdown INTEGER,
+    winner TEXT,                   -- hero | villain | split
+    pot_chips INTEGER,
+    hero_net_bb REAL,              -- postflop result
+    decisions INTEGER NOT NULL DEFAULT 0,
+    graded INTEGER NOT NULL DEFAULT 0,
+    total_loss_bb REAL NOT NULL DEFAULT 0,
+    cut_reason TEXT
+);
+CREATE TABLE hand_decisions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    hand_id INTEGER NOT NULL REFERENCES hands(id) ON DELETE CASCADE,
+    seq INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    node_id TEXT NOT NULL,
+    street TEXT NOT NULL,
+    board TEXT NOT NULL,
+    pot_chips INTEGER NOT NULL,
+    chosen_index INTEGER NOT NULL,
+    chosen_label TEXT NOT NULL,
+    best_index INTEGER,
+    best_label TEXT,
+    best_ev_chips REAL,
+    chosen_ev_chips REAL,
+    loss_bb REAL,
+    loss_pct_pot REAL,
+    grade TEXT,                    -- NULL = not evaluable
+    chosen_frequency REAL,
+    equity REAL,
+    not_evaluable TEXT,
+    decision_ms INTEGER NOT NULL,
+    UNIQUE (hand_id, seq)
+);
+CREATE INDEX hand_decisions_hand ON hand_decisions(hand_id);
+"#,
+    ),
+];
 
 #[derive(Debug, thiserror::Error)]
 pub enum DbError {
@@ -278,6 +339,35 @@ mod tests {
         }
         let db = Db::open(&p).unwrap();
         assert_eq!(db.get_pref("k").unwrap().as_deref(), Some("v"));
+    }
+
+    #[test]
+    fn v1_database_migrates_to_v2_with_backup() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("t.sqlite3");
+        {
+            let c = Connection::open(&p).unwrap();
+            c.execute_batch(MIGRATIONS[0].1).unwrap();
+            c.pragma_update(None, "user_version", 1).unwrap();
+            c.execute("INSERT INTO preferences VALUES ('k', 'v1')", [])
+                .unwrap();
+        }
+        let db = Db::open(&p).unwrap();
+        assert_eq!(db.schema_version().unwrap(), 2);
+        assert_eq!(db.get_pref("k").unwrap().as_deref(), Some("v1"));
+        let n: i64 = db
+            .conn
+            .query_row("SELECT COUNT(*) FROM hands", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(n, 0);
+        let backups: Vec<_> = std::fs::read_dir(dir.path().join("backups"))
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().to_string())
+            .collect();
+        assert!(
+            backups.iter().any(|b| b.contains("pre-migracao-v1")),
+            "{backups:?}"
+        );
     }
 
     #[test]

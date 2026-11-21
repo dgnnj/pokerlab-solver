@@ -24,6 +24,14 @@
     "allow-backup-now",
     "allow-get-pref",
     "allow-set-pref",
+    "allow-hand-boards",
+    "allow-hand-prepare",
+    "allow-hand-status",
+    "allow-hand-cancel",
+    "allow-hand-start",
+    "allow-hand-act",
+    "allow-hand-view",
+    "allow-hand-history",
     "allow-check-update",
     "allow-install-update"
   ]

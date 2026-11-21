@@ -71,6 +71,10 @@ export function Home({ nav }: { nav: Nav }) {
           <b>Treinar</b>
           <span>Escolha um tema e o número de decisões.</span>
         </button>
+        <button className="tile" onClick={() => nav.go({ name: "hand" })}>
+          <b>Mão completa</b>
+          <span>Do flop ao river contra a estratégia do motor, com nota em cada decisão.</span>
+        </button>
         <button className="tile" onClick={() => nav.go({ name: "study" })}>
           <b>Estudar</b>
           <span>Explore a estratégia completa de cada ponto.</span>

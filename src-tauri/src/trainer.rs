@@ -23,6 +23,8 @@ pub enum TrainerError {
     Sqlite(#[from] rusqlite::Error),
     #[error(transparent)]
     Core(#[from] poker_core::CoreError),
+    #[error(transparent)]
+    Engine(#[from] solver_adapter::AdapterError),
     #[error("{0}")]
     Msg(String),
 }
@@ -741,7 +743,7 @@ impl Trainer {
         let ci = node.combo_index(&p.combo).unwrap_or(0);
         let equity = node.equity[ci];
         let pot_bb = node.pot_chips as f64 / cpb;
-        let explanation = explain(node, &fb, equity, cpb);
+        let explanation = explain(&node.actions, &fb, equity, cpb);
         let tx = self.db.conn.transaction()?;
         tx.execute(
             "INSERT INTO attempts(token, session_id, created_at, exercise_id, solution_id, node_id, pack_id, pack_version,
@@ -1108,14 +1110,19 @@ impl Trainer {
 }
 
 /// Number with Brazilian decimal comma.
-fn br(v: f64, digits: usize) -> String {
+pub fn br(v: f64, digits: usize) -> String {
     format!("{v:.digits$}").replace('.', ",")
 }
 
 /// Portuguese explanation built only from the solution data.
-pub fn explain(node: &NodeSolution, fb: &Feedback, equity: f32, cpb: f64) -> Vec<String> {
-    let best = &node.actions[fb.best_index].label;
-    let chosen = &node.actions[fb.chosen_index].label;
+pub fn explain(
+    actions: &[poker_core::solution::ActionInfo],
+    fb: &Feedback,
+    equity: f32,
+    cpb: f64,
+) -> Vec<String> {
+    let best = &actions[fb.best_index].label;
+    let chosen = &actions[fb.chosen_index].label;
     let mut v = Vec::new();
     v.push(format!(
         "Melhor ação para {}: {} (EV {} bb).",

@@ -9,7 +9,7 @@ Especificação: `Especificacao_Treinador_Poker_Cash_Game.md` (v1.0). Decisões:
 | Item | Estado |
 |---|---|
 | PoC do motor (river): solve, export versionado, recarga em outro processo, consulta | **Executado** |
-| Testes de mapeamento combo/ação/frequência/EV, cartas bloqueadas, rake, perda de EV | **Executado** (28 testes Rust, 4 Vitest) |
+| Testes de mapeamento combo/ação/frequência/EV, cartas bloqueadas, rake, perda de EV | **Executado** (50 testes Rust, 6 Vitest) |
 | Pacote BTN x BB SRP 100 bb v1.1.0: 12 flops, flop + turn + river em linhas principais com cartas representativas | **Gerado e verificado** |
 | App: launcher, treino, feedback por EV, estudo 13x13, revisão de erros, progresso, preset ~30 min, CSV, backup | **Executado** no app instalado (E2E via WebView2/CDP) |
 | Persistência após fechar e reabrir | **Executado** (E2E no app instalado) |
@@ -18,7 +18,7 @@ Especificação: `Especificacao_Treinador_Poker_Cash_Game.md` (v1.0). Decisões:
 | CI (`ci.yml`) e release (`release.yml`) no GitHub | **Executado** (release v0.1.0 publicada) |
 | Teste em VM Windows 11 limpa, SmartScreen, Authenticode | **Pendente** |
 | Publicação com chave de produção e feed `dgnnj/pokerlab-solver` | **Executado** (v0.1.0) |
-| Simulação de mão completa (flop ao river contra a política do motor) | **Pendente** (exige árvore completa ou solve no app) |
+| Simulação de mão completa (flop ao river contra a política do motor), árvore do flop resolvida no app | **Executado** no build release (E2E via WebView2: 9h6h3h como BB e 8s7s5d como BTN, 3 mãos cada, histórico após reabrir); ainda não no instalador publicado |
 
 ## Pré-requisitos
 
@@ -77,6 +77,12 @@ npx tauri build
 
 O build com `createUpdaterArtifacts` exige `TAURI_SIGNING_PRIVATE_KEY` (use a chave **dev** gerada por `npx tauri signer generate -w .keys/updater-dev.key`, que fica fora do git) ou desative: `npx tauri build --config src-tauri/tauri.ci.conf.json`.
 
+E2E da mão completa (resolve um flop no app, joga mãos até o fim, fecha, reabre e confere o histórico). Use o build **release**: no build debug o solve fica ~20x mais lento.
+
+```bash
+node tests/e2e/hand-sim.mjs --exe "$LOCALAPPDATA/pokerlab-target/release/pokerlab.exe" --pack src-tauri/resources/packs/btn-vs-bb-srp-100bb --board 9h6h3h --hands 3 --hero BB
+```
+
 E2E da interface no app instalado (treina, fecha, reabre, confere histórico):
 
 ```bash
@@ -98,8 +104,8 @@ node tests/e2e/updater.mjs
 ## Estrutura
 
 ```text
-crates/poker-core      domínio: cartas, spots, formato de solução, pacotes, avaliação de EV (sem o motor)
-crates/solver-adapter  único módulo que usa o postflop-solver (build, solve, navegação, export)
+crates/poker-core      domínio: cartas, spots, formato de solução, pacotes, avaliação de EV, ranking de mãos (sem o motor)
+crates/solver-adapter  único módulo que usa o postflop-solver (build, solve, navegação, export, simulação de mão)
 crates/pokerlab-cli    solve / query / verify-reload / gen-pack / verify-pack
 data/spots             spots versionados (TOML): PoC de river e template BTN x BB
 data/packs             configuração do pacote inicial (lista de boards)
@@ -108,6 +114,14 @@ src                    interface React
 tests/e2e              testes ponta a ponta do app instalado e do updater
 .github/workflows      CI e release em rascunho
 ```
+
+## Mão completa
+
+O pacote só guarda as linhas principais, então a mão inteira usa a árvore completa do flop, resolvida no próprio app em segundo plano com o spot gravado na solução do pacote (mesmo hash de configuração; o app mostra se difere). No Ryzen 5 7600X: 25–60 s e 1,2–4,2 GB de RAM por board (acima de 6 GiB estimados o motor usa armazenamento comprimido). Uma árvore por vez fica na memória enquanto o app está aberto; as mãos seguintes no mesmo board são instantâneas.
+
+- Mãos privadas sorteadas juntas pelos pesos dos ranges, sem cartas em comum; o adversário sorteia cada ação pela estratégia da mão dele no nó; turn e river saem do baralho restante. All-in pago antes do river é nó terminal no motor (ele faz a média dos runouts), então o app distribui as cartas restantes para o showdown.
+- Cada decisão é avaliada pela perda de EV no mesmo nó e mão. Se a sua linha leva a mão a peso praticamente nulo na solução (< 0,001% do peso inicial), a nota termina na última decisão avaliável e o motivo aparece.
+- Resultado no pós-flop (o pote inicial conta para quem leva) separado da qualidade das decisões. Histórico em `hands` / `hand_decisions` (schema v2; migração com backup).
 
 ## Dados do usuário
 

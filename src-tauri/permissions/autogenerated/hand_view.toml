@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-hand-view"
+description = "Enables the hand_view command without any pre-configured scope."
+commands.allow = ["hand_view"]
+
+[[permission]]
+identifier = "deny-hand-view"
+description = "Denies the hand_view command without any pre-configured scope."
+commands.deny = ["hand_view"]

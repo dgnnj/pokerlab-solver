@@ -9,6 +9,7 @@ import { Study } from "./screens/Study";
 import { Progress } from "./screens/Progress";
 import { Settings } from "./screens/Settings";
 import { Preset } from "./screens/Preset";
+import { Hand } from "./screens/Hand";
 
 export type Screen =
   | { name: "launcher" }
@@ -17,6 +18,7 @@ export type Screen =
   | { name: "train"; sessionId: number; returnTo?: Screen }
   | { name: "summary"; summary: SessionSummary; returnTo?: Screen }
   | { name: "study"; exerciseId?: string; highlight?: string | null; back?: Screen }
+  | { name: "hand" }
   | { name: "progress" }
   | { name: "settings" }
   | { name: "preset"; step: number; sessionId?: number };
@@ -30,6 +32,7 @@ export interface Nav {
 const MENU: { label: string; screen: Screen; key: string }[] = [
   { label: "Início", screen: { name: "home" }, key: "home" },
   { label: "Treinar", screen: { name: "setup", mode: "representative" }, key: "setup" },
+  { label: "Mão completa", screen: { name: "hand" }, key: "hand" },
   { label: "Estudar", screen: { name: "study" }, key: "study" },
   { label: "Revisar erros", screen: { name: "setup", mode: "review" }, key: "review" },
   { label: "Progresso", screen: { name: "progress" }, key: "progress" },
@@ -102,6 +105,7 @@ export default function App() {
         {screen.name === "study" && (
           <Study nav={nav} exerciseId={screen.exerciseId} highlight={screen.highlight ?? null} back={screen.back} />
         )}
+        {screen.name === "hand" && <Hand nav={nav} />}
         {screen.name === "progress" && <Progress />}
         {screen.name === "settings" && <Settings nav={nav} />}
         {screen.name === "preset" && <Preset nav={nav} step={screen.step} />}
