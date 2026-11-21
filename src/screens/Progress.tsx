@@ -85,7 +85,27 @@ export function Progress() {
           Textura
           <select value={filter.texture ?? ""} onChange={set("texture")}>
             <option value="">Todas</option>
-            {["rainbow", "two-tone", "monotone", "paired", "connected", "A-high", "broadway-high", "middle", "low"].map((t) => (
+            {[
+              "rainbow",
+              "two-tone",
+              "monotone",
+              "paired",
+              "connected",
+              "A-high",
+              "broadway-high",
+              "middle",
+              "low",
+              "turn:flush",
+              "turn:over",
+              "turn:pair",
+              "turn:low",
+              "turn:mid",
+              "river:flush",
+              "river:over",
+              "river:pair",
+              "river:low",
+              "river:mid",
+            ].map((t) => (
               <option key={t} value={t}>
                 {t}
               </option>

@@ -136,6 +136,8 @@ td.grade-mistake, li.grade-mistake { color: var(--bad); }
 .form label, .filters label { display: flex; flex-direction: column; gap: 0.3rem; color: var(--muted); font-size: 0.9rem; }
 .form label.radio, label.radio { flex-direction: row; align-items: center; gap: 0.5rem; color: var(--text); font-size: 1rem; }
 fieldset { border: 1px solid #3a4a4f; border-radius: 8px; }
+.row label.grow { flex: 1; min-width: 320px; }
+.row label { display: flex; flex-direction: column; gap: 0.3rem; color: var(--muted); font-size: 0.9rem; }
 .filters { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 0.6rem; margin-bottom: 0.75rem; }
 
 /* Study */

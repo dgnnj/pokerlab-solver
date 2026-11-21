@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, errorText, FeedbackView, Presented } from "../api";
 import type { Nav, Screen } from "../App";
 import { CardRow } from "../components/Cards";
-import { actionClass, bb, freq, MODE_LABEL, pct } from "../format";
+import { actionClass, bb, formatLine, freq, MODE_LABEL, pct } from "../format";
 
 // Keeps the current exercise/feedback per session so that switching to Study and back
 // restores the same decision instead of drawing a new one.
@@ -158,7 +158,7 @@ export function Train({ nav, sessionId, returnTo }: { nav: Nav; sessionId: numbe
 
       <div className="line">
         <b>Ação até aqui:</b> {ex.preflop_line}
-        {ex.line.length > 0 && <> · Flop: {ex.line.join(", ")}</>}
+        {ex.line.length > 0 && <> · {formatLine(ex.line)}</>}
         {ex.line.length === 0 && <> · Primeira ação no {ex.street}</>}
       </div>
 

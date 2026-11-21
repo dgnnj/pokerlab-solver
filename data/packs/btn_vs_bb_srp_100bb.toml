@@ -1,13 +1,14 @@
 # Pacote inicial incluído no instalador.
 pack_id = "btn-vs-bb-srp-100bb"
-version = "1.0.0"
-title = "BTN x BB — pote simples 100 bb (flop)"
-description = "Decisões de flop após BTN abrir 2,5 bb e BB pagar. C-bet do BTN, defesa do BB contra c-bet e respostas ao check-raise."
+version = "1.1.0"
+title = "BTN x BB — pote simples 100 bb (flop, turn e river)"
+description = "Decisões após BTN abrir 2,5 bb e BB pagar: flop (c-bet, defesa, check-raise), turn e river em linhas principais com cartas representativas (flush, overcard, pareada, baixa, do meio)."
 license = "Dados gerados pelo projeto PokerLab com postflop-solver (AGPL-3.0-or-later). Ranges próprios, premissas de estudo."
 provenance = "Gerado por `pokerlab-cli gen-pack` a partir de data/spots/btn_vs_bb_srp_100bb.toml; ranges manuais revisados em 2026-11-20; sem rake."
 template_spot = "../spots/btn_vs_bb_srp_100bb.toml"
 export_depth = 3
 max_exploitability_pct = 1.0
+
 boards = [
   "Ah7c2d",
   "Kd8s3h",
@@ -22,3 +23,18 @@ boards = [
   "QsJd2c",
   "7c7d2s",
 ]
+
+# Turn: after check-check, small c-bet called and big c-bet called on the flop, five representative
+# turn cards each. River: for the first two turn cards of each flop line, after turn check-check and
+# turn bet-call, three representative river cards. Two decisions deep on each street.
+[export]
+depth = 3
+[export.runouts]
+lines = ["x-x", "x-bS-c", "x-bL-c"]
+cards = 5
+depth = 2
+expand = 2
+[export.runouts.next]
+lines = ["x-x", "x-bS-c"]
+cards = 3
+depth = 2

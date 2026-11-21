@@ -187,3 +187,61 @@ fn corrupted_installed_pack_is_restored_from_bundle() {
     let m = poker_core::pack::PackManifest::load(&t.pack.dir).unwrap();
     m.verify_and_load(&t.pack.dir).unwrap();
 }
+
+#[test]
+fn turn_and_river_drills_use_dealt_board_and_line() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut t = open(dir.path(), 11);
+    for (street, cards, marker) in [("turn", 4, "Turn: "), ("river", 5, "River: ")] {
+        let s = t
+            .start_session(Mode::Representative, Some(format!("street:{street}")), 3)
+            .unwrap();
+        for _ in 0..3 {
+            let ex = t.next_exercise(s.id).unwrap().unwrap();
+            assert_eq!(ex.street, street);
+            assert_eq!(ex.board.len(), cards);
+            assert!(
+                ex.line.iter().any(|l| l.starts_with(marker)),
+                "{:?}",
+                ex.line
+            );
+            // Hero cards never collide with the dealt board.
+            for c in &ex.hero_cards {
+                assert!(!ex.board.contains(c), "{c} on board {:?}", ex.board);
+            }
+            let fb = t.submit(&ex.token, 0, None).unwrap();
+            assert!(fb.feedback.loss_bb >= 0.0);
+        }
+    }
+    let rep = t
+        .progress(&ProgressFilter {
+            street: Some("river".into()),
+            ..Default::default()
+        })
+        .unwrap();
+    assert_eq!(rep.total.n, 3);
+    assert!(t
+        .start_session(Mode::Representative, Some("street:preflop".into()), 1)
+        .is_err());
+}
+
+#[test]
+fn rebuilt_pack_with_same_version_replaces_installed_copy() {
+    let dir = tempfile::tempdir().unwrap();
+    let installed = {
+        let t = open(dir.path(), 21);
+        t.pack.dir.clone()
+    };
+    // Simulate an older build of the same version: a different (but internally valid) manifest.
+    let mpath = installed.join("manifest.json");
+    let mut m: serde_json::Value = serde_json::from_slice(&std::fs::read(&mpath).unwrap()).unwrap();
+    m["description"] = serde_json::Value::String("build antigo".into());
+    std::fs::write(&mpath, serde_json::to_vec(&m).unwrap()).unwrap();
+    let t = open(dir.path(), 22);
+    assert_ne!(t.pack.manifest.description, "build antigo");
+    let bundled = std::fs::read(bundled().join("manifest.json")).unwrap();
+    assert_eq!(
+        std::fs::read(t.pack.dir.join("manifest.json")).unwrap(),
+        bundled
+    );
+}

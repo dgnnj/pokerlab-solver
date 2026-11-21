@@ -3,7 +3,7 @@ import { api, errorText, StudyEntry, StudyView } from "../api";
 import type { Nav, Screen } from "../App";
 import { CardRow } from "../components/Cards";
 import { ActionLegend, RangeGrid } from "../components/RangeGrid";
-import { bb, freq, pct } from "../format";
+import { bb, formatLine, freq, pct, STREET_LABEL } from "../format";
 
 export function Study({
   nav,
@@ -20,6 +20,7 @@ export function Study({
   const [current, setCurrent] = useState<string | undefined>(exerciseId);
   const [view, setView] = useState<StudyView | null>(null);
   const [hand, setHand] = useState<string | null>(null);
+  const [street, setStreet] = useState<string>("");
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
@@ -48,7 +49,10 @@ export function Study({
   }, [current, highlight]);
 
   const boards = useMemo(() => Array.from(new Set(entries.map((e) => e.board))), [entries]);
-  const selectedBoard = entries.find((e) => e.exercise_id === current)?.board;
+  const currentEntry = entries.find((e) => e.exercise_id === current);
+  const selectedBoard = currentEntry?.board;
+  const selectedStreet = street || currentEntry?.street || "flop";
+  const points = entries.filter((e) => e.board === selectedBoard && e.street === selectedStreet);
   const combos = view && hand ? view.combos.filter((c) => c.hand === hand) : [];
 
   return (
@@ -64,7 +68,9 @@ export function Study({
           <select
             value={selectedBoard ?? ""}
             onChange={(e) => {
-              const first = entries.find((x) => x.board === e.target.value);
+              const first =
+                entries.find((x) => x.board === e.target.value && x.street === selectedStreet) ??
+                entries.find((x) => x.board === e.target.value);
               if (first) setCurrent(first.exercise_id);
             }}
           >
@@ -76,15 +82,32 @@ export function Study({
           </select>
         </label>
         <label>
-          Ponto de decisão
-          <select value={current ?? ""} onChange={(e) => setCurrent(e.target.value)}>
-            {entries
-              .filter((e) => e.board === selectedBoard)
-              .map((e) => (
-                <option key={e.exercise_id} value={e.exercise_id}>
-                  {e.position}: {e.line.length ? e.line.join(", ") : "primeira ação"}
+          Rua
+          <select
+            value={selectedStreet}
+            onChange={(e) => {
+              setStreet(e.target.value);
+              const first = entries.find((x) => x.board === selectedBoard && x.street === e.target.value);
+              if (first) setCurrent(first.exercise_id);
+            }}
+          >
+            {["flop", "turn", "river"]
+              .filter((s) => entries.some((e) => e.board === selectedBoard && e.street === s))
+              .map((s) => (
+                <option key={s} value={s}>
+                  {STREET_LABEL[s]}
                 </option>
               ))}
+          </select>
+        </label>
+        <label className="grow">
+          Ponto de decisão ({points.length})
+          <select value={current ?? ""} onChange={(e) => setCurrent(e.target.value)}>
+            {points.map((e) => (
+              <option key={e.exercise_id} value={e.exercise_id}>
+                {e.position}: {e.line.length ? formatLine(e.line) : "primeira ação"}
+              </option>
+            ))}
           </select>
         </label>
       </div>
@@ -96,7 +119,7 @@ export function Study({
               <b>{view.theme_label}</b>
               <div className="muted">
                 {view.preflop_line}
-                {view.line.length > 0 && ` · ${view.line.join(", ")}`} · {view.position} decide · pote {bb(view.pot_bb)}
+                {view.line.length > 0 && ` · ${formatLine(view.line)}`} · {view.position} decide · pote {bb(view.pot_bb)}
                 {view.to_call_bb > 0 && ` · a pagar ${bb(view.to_call_bb)}`} · stack {bb(view.stack_bb)}
               </div>
             </div>

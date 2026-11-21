@@ -77,9 +77,18 @@ pub fn install_pack(db: &Db, bundled: &Path, packs_root: &Path) -> R<LoadedPack>
     let target = packs_root
         .join(&src_manifest.pack_id)
         .join(&src_manifest.version);
-    let valid = PackManifest::load(&target)
-        .ok()
-        .and_then(|m| m.verify_and_load(&target).ok().map(|s| (m, s)));
+    // The installed copy is reused only if it is byte-identical to the bundled manifest (same
+    // pack id/version rebuilt with different content is reinstalled) and passes verification.
+    let bundled_sha = sha256_hex(&std::fs::read(bundled.join("manifest.json")).unwrap_or_default());
+    let installed_sha =
+        sha256_hex(&std::fs::read(target.join("manifest.json")).unwrap_or_default());
+    let valid = if bundled_sha == installed_sha {
+        PackManifest::load(&target)
+            .ok()
+            .and_then(|m| m.verify_and_load(&target).ok().map(|s| (m, s)))
+    } else {
+        None
+    };
     let (manifest, sols) = match valid {
         Some(v) => v,
         None => {
@@ -309,8 +318,17 @@ pub struct StudyEntry {
     pub exercise_id: String,
     pub theme_label: String,
     pub board: String,
+    pub street: String,
     pub position: String,
     pub line: Vec<String>,
+}
+
+/// A session filter is either an exact theme key or `street:<flop|turn|river>`.
+pub fn theme_matches(e: &ExerciseDef, filter: &str) -> bool {
+    match filter.strip_prefix("street:") {
+        Some(street) => e.street.label_pt() == street,
+        None => e.theme == filter,
+    }
 }
 
 pub struct Trainer {
@@ -384,6 +402,7 @@ impl Trainer {
                     exercise_id: e.id.clone(),
                     theme_label: e.theme_label.clone(),
                     board: e.board.clone(),
+                    street: e.street.label_pt().to_string(),
                     position: e.position.clone(),
                     line: n.line.clone(),
                 })
@@ -443,7 +462,13 @@ impl Trainer {
             return msg("número de decisões deve estar entre 1 e 200");
         }
         if let Some(t) = &theme {
-            if !self.pack.manifest.exercises.iter().any(|e| &e.theme == t) {
+            if !self
+                .pack
+                .manifest
+                .exercises
+                .iter()
+                .any(|e| theme_matches(e, t))
+            {
                 return msg(format!("tema desconhecido: {t}"));
             }
         }
@@ -593,7 +618,7 @@ impl Trainer {
                 .manifest
                 .exercises
                 .iter()
-                .filter(|e| session.theme.as_ref().is_none_or(|t| &e.theme == t))
+                .filter(|e| session.theme.as_ref().is_none_or(|t| theme_matches(e, t)))
                 .cloned()
                 .collect();
             if pool.is_empty() {

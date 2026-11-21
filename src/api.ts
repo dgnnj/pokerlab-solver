@@ -215,6 +215,7 @@ export interface StudyEntry {
   exercise_id: string;
   theme_label: string;
   board: string;
+  street: string;
   position: string;
   line: string[];
 }

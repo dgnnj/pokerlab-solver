@@ -295,6 +295,9 @@ fn line_label(position: &str, a: &ActionInfo, cpb: i32) -> String {
     }
 }
 
+/// (history, node id, readable line, runout tags) of an exportable decision node.
+pub type NodeRef = (Vec<usize>, String, Vec<String>, Vec<String>);
+
 /// Lists decision nodes reachable from the root without crossing a chance node, up to `max_depth`
 /// actions. Returns (history, node_id, readable line).
 pub fn enumerate_decision_nodes(
@@ -302,20 +305,53 @@ pub fn enumerate_decision_nodes(
     spot: &SpotConfig,
     max_depth: usize,
 ) -> Vec<(Vec<usize>, String, Vec<String>)> {
+    enumerate_from(game, spot, &Base::root(), max_depth)
+        .into_iter()
+        .map(|(h, id, l, _)| (h, id, l))
+        .collect()
+}
+
+/// Starting point of an enumeration: a history plus the id/line/runout tags that lead to it.
+#[derive(Debug, Clone, Default)]
+pub struct Base {
+    pub history: Vec<usize>,
+    pub id: String,
+    pub line: Vec<String>,
+    pub runout: Vec<String>,
+}
+
+impl Base {
+    pub fn root() -> Self {
+        Base::default()
+    }
+}
+
+/// Decision nodes reachable from `base` (a decision node or the first node after a dealt card)
+/// without crossing another chance node, up to `max_depth` actions after `base`.
+pub fn enumerate_from(
+    game: &mut PostFlopGame,
+    spot: &SpotConfig,
+    base: &Base,
+    max_depth: usize,
+) -> Vec<NodeRef> {
     let mut out = Vec::new();
-    let mut stack: Vec<(Vec<usize>, Vec<String>, Vec<String>)> = vec![(vec![], vec![], vec![])];
-    while let Some((hist, codes, line)) = stack.pop() {
+    // (history, local action codes, readable line, depth after base)
+    type Frame = (Vec<usize>, Vec<String>, Vec<String>, usize);
+    let mut stack: Vec<Frame> = vec![(base.history.clone(), vec![], base.line.clone(), 0)];
+    while let Some((hist, codes, line, depth)) = stack.pop() {
         game.apply_history(&hist);
         if game.is_terminal_node() || game.is_chance_node() {
             continue;
         }
-        let id = if codes.is_empty() {
-            "root".to_string()
-        } else {
-            codes.join("-")
+        let local = codes.join("-");
+        let id = match (base.id.is_empty(), local.is_empty()) {
+            (true, true) => "root".to_string(),
+            (true, false) => local,
+            (false, true) => base.id.clone(),
+            (false, false) => format!("{}|{local}", base.id),
         };
-        out.push((hist.clone(), id, line.clone()));
-        if hist.len() >= max_depth {
+        out.push((hist.clone(), id, line.clone(), base.runout.clone()));
+        if depth >= max_depth {
             continue;
         }
         let player = game.current_player();
@@ -328,12 +364,169 @@ pub fn enumerate_decision_nodes(
             c.push(action_code(a));
             let mut l = line.clone();
             l.push(line_label(&pos, a, spot.chips_per_bb));
-            stack.push((h, c, l));
+            stack.push((h, c, l, depth + 1));
         }
     }
     game.back_to_root();
     out.sort_by(|a, b| a.0.len().cmp(&b.0.len()).then(a.0.cmp(&b.0)));
     out
+}
+
+/// One runout stage of an export plan: from the current street, follow each `line` to the chance
+/// node, deal `cards` representative cards and export decisions up to `depth` actions. The first
+/// `expand` cards of every line continue into `next` (e.g. turn -> river).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
+pub struct RunoutStage {
+    /// Lines in action tokens: x (check), c (call), f (fold), bS / bL (smallest / largest bet),
+    /// r (first raise), a (all-in). Example: "x-bS-c".
+    pub lines: Vec<String>,
+    pub cards: usize,
+    pub depth: usize,
+    #[serde(default)]
+    pub expand: usize,
+    #[serde(default)]
+    pub next: Option<Box<RunoutStage>>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
+pub struct ExportPlan {
+    /// Decision depth on the initial street.
+    pub depth: usize,
+    #[serde(default)]
+    pub runouts: Option<RunoutStage>,
+}
+
+impl ExportPlan {
+    pub fn initial_only(depth: usize) -> Self {
+        ExportPlan {
+            depth,
+            runouts: None,
+        }
+    }
+}
+
+type Resolved = (Vec<usize>, Vec<String>, Vec<String>);
+
+/// Follows `line` tokens from `base`; returns the extended history, codes and labels.
+fn resolve_line(
+    game: &mut PostFlopGame,
+    spot: &SpotConfig,
+    base: &[usize],
+    line: &str,
+) -> Result<Resolved, AdapterError> {
+    let mut hist = base.to_vec();
+    let mut codes = Vec::new();
+    let mut labels = Vec::new();
+    for tok in line.split('-').map(str::trim).filter(|t| !t.is_empty()) {
+        game.apply_history(&hist);
+        if game.is_terminal_node() || game.is_chance_node() {
+            game.back_to_root();
+            return Err(AdapterError::Navigation(format!(
+                "linha '{line}' termina antes de '{tok}'"
+            )));
+        }
+        let player = game.current_player();
+        let actions = describe_actions(game, spot);
+        let bets: Vec<usize> = (0..actions.len())
+            .filter(|&i| actions[i].kind == ActionKind::Bet)
+            .collect();
+        let idx = match tok {
+            "x" => actions.iter().position(|a| a.kind == ActionKind::Check),
+            "c" => actions.iter().position(|a| a.kind == ActionKind::Call),
+            "f" => actions.iter().position(|a| a.kind == ActionKind::Fold),
+            "bS" | "b" => bets.first().copied(),
+            "bL" => bets.last().copied(),
+            "r" => actions.iter().position(|a| a.kind == ActionKind::Raise),
+            "a" => actions.iter().position(|a| a.kind == ActionKind::AllIn),
+            _ => None,
+        }
+        .ok_or_else(|| {
+            AdapterError::Navigation(format!("ação '{tok}' indisponível na linha '{line}'"))
+        })?;
+        labels.push(line_label(
+            &seat_position(spot, player),
+            &actions[idx],
+            spot.chips_per_bb,
+        ));
+        codes.push(action_code(&actions[idx]));
+        hist.push(idx);
+    }
+    game.back_to_root();
+    Ok((hist, codes, labels))
+}
+
+fn export_stage(
+    game: &mut PostFlopGame,
+    spot: &SpotConfig,
+    base: &Base,
+    stage: &RunoutStage,
+    out: &mut Vec<NodeRef>,
+) -> Result<(), AdapterError> {
+    for line in &stage.lines {
+        let (hist, codes, labels) = resolve_line(game, spot, &base.history, line)?;
+        game.apply_history(&hist);
+        if !game.is_chance_node() {
+            game.back_to_root();
+            return Err(AdapterError::Navigation(format!(
+                "linha '{line}' não leva a uma nova carta (fim de mão ou all-in)"
+            )));
+        }
+        let board = game.current_board();
+        let possible = game.possible_cards();
+        game.back_to_root();
+        let street_name = if board.len() == 3 { "Turn" } else { "River" };
+        let picks = poker_core::runout::select_runout_cards(&board, !possible, stage.cards);
+        let line_id = codes.join("-");
+        for (k, &(card, kind)) in picks.iter().enumerate() {
+            let mut h = hist.clone();
+            h.push(card as usize);
+            let id = if base.id.is_empty() {
+                format!("{line_id}|{}", card_to_string(card))
+            } else if line_id.is_empty() {
+                format!("{}|{}", base.id, card_to_string(card))
+            } else {
+                format!("{}|{line_id}|{}", base.id, card_to_string(card))
+            };
+            let mut l = base.line.clone();
+            l.extend(labels.iter().cloned());
+            l.push(format!(
+                "{street_name}: {}",
+                poker_core::runout::describe(card, kind, &board)
+            ));
+            let mut r = base.runout.clone();
+            r.push(format!("{}:{}", street_name.to_lowercase(), kind.tag()));
+            let next_base = Base {
+                history: h,
+                id,
+                line: l,
+                runout: r,
+            };
+            out.extend(enumerate_from(game, spot, &next_base, stage.depth));
+            if let Some(next) = &stage.next {
+                if k < stage.expand {
+                    export_stage(game, spot, &next_base, next, out)?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// All nodes selected by the plan: initial street up to `plan.depth`, plus the runout stages.
+pub fn plan_nodes(
+    game: &mut PostFlopGame,
+    spot: &SpotConfig,
+    plan: &ExportPlan,
+) -> Result<Vec<NodeRef>, AdapterError> {
+    let root = Base::root();
+    let mut out = enumerate_from(game, spot, &root, plan.depth);
+    if let Some(stage) = &plan.runouts {
+        export_stage(game, spot, &root, stage, &mut out)?;
+    }
+    game.back_to_root();
+    let mut seen = std::collections::HashSet::new();
+    out.retain(|n| seen.insert(n.1.clone()));
+    Ok(out)
 }
 
 /// Exports the decision node at `history`: eligible combos (non-zero normalized weight and not
@@ -345,6 +538,19 @@ pub fn extract_node(
     node_id: &str,
     line: Vec<String>,
     root_mass: f64,
+) -> Result<NodeSolution, AdapterError> {
+    extract_node_with_runout(game, spot, history, node_id, line, root_mass, vec![])
+}
+
+/// Same as [`extract_node`], tagging the node with the runout categories used to reach it.
+pub fn extract_node_with_runout(
+    game: &mut PostFlopGame,
+    spot: &SpotConfig,
+    history: &[usize],
+    node_id: &str,
+    line: Vec<String>,
+    root_mass: f64,
+    runout: Vec<String>,
 ) -> Result<NodeSolution, AdapterError> {
     game.apply_history(history);
     if game.is_terminal_node() || game.is_chance_node() {
@@ -409,25 +615,39 @@ pub fn extract_node(
         } else {
             0.0
         },
+        runout,
     };
     game.back_to_root();
     Ok(node)
 }
 
-/// Builds the versioned solution file from a solved game and a list of nodes to export.
+/// Builds the versioned solution file exporting the initial street up to `max_depth` actions.
 pub fn build_solution_file(
     solved: &mut SolvedGame,
     spot: &SpotConfig,
     max_depth: usize,
 ) -> Result<SolutionFile, AdapterError> {
+    build_solution_file_with_plan(solved, spot, &ExportPlan::initial_only(max_depth))
+}
+
+/// Builds the versioned solution file from a solved game and an export plan.
+pub fn build_solution_file_with_plan(
+    solved: &mut SolvedGame,
+    spot: &SpotConfig,
+    plan: &ExportPlan,
+) -> Result<SolutionFile, AdapterError> {
     let game = &mut solved.game;
     game.back_to_root();
     let root_actions = describe_actions(game, spot);
     let root_mass = joint_mass(game, &[]);
-    let list = enumerate_decision_nodes(game, spot, max_depth);
+    let list = plan_nodes(game, spot, plan)?;
     let mut nodes = Vec::with_capacity(list.len());
-    for (hist, id, line) in list {
-        nodes.push(extract_node(game, spot, &hist, &id, line, root_mass)?);
+    for (hist, id, line, runout) in list {
+        let node = extract_node_with_runout(game, spot, &hist, &id, line, root_mass, runout)?;
+        // Lines the equilibrium never reaches have no eligible combo: nothing to study or drill.
+        if !node.combos.is_empty() {
+            nodes.push(node);
+        }
     }
     let file = SolutionFile {
         schema_version: SOLUTION_SCHEMA_VERSION,
@@ -438,6 +658,7 @@ pub fn build_solution_file(
         spot: spot.clone(),
         solve: solved.info.clone(),
         root_actions,
+        export_plan: serde_json::to_string(plan).ok(),
         nodes,
     };
     file.validate()?;

@@ -205,6 +205,7 @@ mod tests {
             ev: evs,
             equity: vec![0.5, 0.5],
             reach: 1.0,
+            runout: vec![],
         }
     }
 

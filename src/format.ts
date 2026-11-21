@@ -37,6 +37,26 @@ export function cardFace(card: string): CardFace {
   };
 }
 
+/** Groups a node line by street: "Flop: BB passa, BTN aposta 1,82 bb · Turn Th (overcard): BB passa". */
+export function formatLine(line: string[]): string {
+  const groups: string[] = [];
+  let head = "Flop";
+  let items: string[] = [];
+  const flush = () => groups.push(items.length ? `${head}: ${items.join(", ")}` : head);
+  for (const l of line) {
+    const m = l.match(/^(Turn|River): (.*)$/);
+    if (m) {
+      flush();
+      head = `${m[1]} ${m[2]}`;
+      items = [];
+    } else items.push(l);
+  }
+  if (items.length || line.length) flush();
+  return groups.join(" · ");
+}
+
+export const STREET_LABEL: Record<string, string> = { flop: "Flop", turn: "Turn", river: "River" };
+
 export const GRADE_LABEL: Record<string, string> = {
   best: "Melhor ação",
   close: "Próxima",

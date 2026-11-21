@@ -36,6 +36,7 @@
 - Árvore: flop BB só check/check-raise 3x; BTN 33%/75%, raise 3x; turn/river 75%, raise 3x; add all-in 1,5; force all-in 0,15; merge 0,1.
 - Meta: 0,5% do pote inicial, máx. 1000 iterações; o gerador recusa > 1,0%.
 - Exercícios: nós de decisão do flop até profundidade 3, com ≥ 2 ações e alcance conjunto ≥ 2% da raiz.
+- **Turn e river (pacote 1.1.0, 2026-11-21):** exportar todos os runouts não cabe no instalador. O plano `[export]` segue linhas principais (flop x-x, x-bS-c, x-bL-c; turn x-x, x-bS-c) e cartas representativas escolhidas de forma determinística por categoria (`poker_core::runout`): carta do naipe do board (3ª/4ª do naipe), overcard, pareia a carta alta, baixa, do meio. Cada exercício usa os ranges do motor na linha jogada (pesos normalizados no nó). A escolha das cartas é cobertura, não frequência real: as estatísticas de turn/river não representam a distribuição completa de runouts. IDs de nó usam `|` entre ruas, p.ex. `x-b182-c|Th|x`.
 
 ### 5. Avaliação
 - Tolerância "próxima": `max(0,05 bb, 1% do pote antes da decisão)` — da ordem do ruído da meta de explorabilidade. Faixas: melhor / próxima / imprecisão (≤ 5% do pote) / erro.

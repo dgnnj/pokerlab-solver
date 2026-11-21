@@ -4,20 +4,21 @@ Aplicativo Windows 11 x64, em português, para treinar decisões pós-flop offli
 
 Especificação: `Especificacao_Treinador_Poker_Cash_Game.md` (v1.0). Decisões: [docs/adr/0001-fundacao.md](docs/adr/0001-fundacao.md).
 
-## Estado (2026-11-20)
+## Estado (2026-11-21)
 
 | Item | Estado |
 |---|---|
 | PoC do motor (river): solve, export versionado, recarga em outro processo, consulta | **Executado** |
 | Testes de mapeamento combo/ação/frequência/EV, cartas bloqueadas, rake, perda de EV | **Executado** (28 testes Rust, 4 Vitest) |
-| Pacote inicial BTN x BB SRP 100 bb (12 flops, 47 exercícios) | **Gerado e verificado** |
+| Pacote BTN x BB SRP 100 bb v1.1.0: 12 flops, flop + turn + river em linhas principais com cartas representativas | **Gerado e verificado** |
 | App: launcher, treino, feedback por EV, estudo 13x13, revisão de erros, progresso, preset ~30 min, CSV, backup | **Executado** no app instalado (E2E via WebView2/CDP) |
 | Persistência após fechar e reabrir | **Executado** (E2E no app instalado) |
 | Instalador NSIS por usuário | **Executado** nesta máquina (Windows 11 Pro) |
 | Updater 0.1.0 → 0.1.1 com feed local e chave dev, incl. falhas | **Executado** (11/11 checks) |
-| CI (`ci.yml`) e release em rascunho (`release.yml`) | **Escrito, não executado** (não há repositório GitHub) |
+| CI (`ci.yml`) e release (`release.yml`) no GitHub | **Executado** (release v0.1.0 publicada) |
 | Teste em VM Windows 11 limpa, SmartScreen, Authenticode | **Pendente** |
-| Publicação real, chave de produção, endpoint `OWNER/REPO` | **Pendente** (aguarda repositório e autorização) |
+| Publicação com chave de produção e feed `dgnnj/pokerlab-solver` | **Executado** (v0.1.0) |
+| Simulação de mão completa (flop ao river contra a política do motor) | **Pendente** (exige árvore completa ou solve no app) |
 
 ## Pré-requisitos
 
@@ -54,7 +55,7 @@ cargo run --release -p pokerlab-cli -- verify-reload out/river_poc.solution.json
 cargo run --release -p pokerlab-cli -- query out/river_poc.solution.json --node x-b1000 --combo AhKd --action 0
 ```
 
-Pacote inicial (≈15 min, ~4 GB de RAM por flop; reaproveita cache quando a configuração não mudou):
+Pacote inicial (≈15 min, ~4 GB de RAM por flop; reaproveita cache quando spot, motor e plano de exportação não mudaram). O plano `[export]` em `data/packs/btn_vs_bb_srp_100bb.toml` escolhe as linhas de flop/turn e quantas cartas representativas de turn e river exportar:
 
 ```bash
 cargo run --release -p pokerlab-cli -- gen-pack data/packs/btn_vs_bb_srp_100bb.toml --out src-tauri/resources/packs/btn-vs-bb-srp-100bb

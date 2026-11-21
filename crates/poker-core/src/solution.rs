@@ -118,6 +118,9 @@ pub struct NodeSolution {
     /// Nodes reached only through near-zero frequencies are not used as exercises.
     #[serde(default = "one")]
     pub reach: f32,
+    /// Runout categories dealt to reach this node, e.g. `["turn:over", "river:low"]`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub runout: Vec<String>,
 }
 
 fn one() -> f32 {
@@ -207,6 +210,9 @@ pub struct SolutionFile {
     pub solve: SolveInfo,
     /// Root-level available actions (tree shape check).
     pub root_actions: Vec<ActionInfo>,
+    /// Canonical JSON of the export plan used (which nodes and runouts were exported).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub export_plan: Option<String>,
     pub nodes: Vec<NodeSolution>,
 }
 
@@ -225,7 +231,12 @@ impl SolutionFile {
         self.spot.validate()?;
         let mask = self.spot.board_mask()?;
         for n in &self.nodes {
-            n.validate(mask)?;
+            // Turn/river nodes also exclude combos blocked by the dealt runout cards.
+            let mut node_mask = mask;
+            for c in &n.board {
+                node_mask |= 1u64 << crate::cards::parse_card(c)?;
+            }
+            n.validate(node_mask)?;
         }
         Ok(())
     }

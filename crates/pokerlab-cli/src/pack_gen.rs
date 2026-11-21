@@ -26,6 +26,10 @@ pub struct PackConfig {
     pub boards: Vec<String>,
     #[serde(default = "default_depth")]
     pub export_depth: usize,
+    /// Turn/river runouts to export (optional). When present, `export.depth` replaces
+    /// `export_depth` for the initial street.
+    #[serde(default)]
+    pub export: Option<solver_adapter::ExportPlan>,
     /// Reject a solution whose final exploitability exceeds this % of the pot.
     pub max_exploitability_pct: f64,
 }
@@ -37,7 +41,33 @@ fn default_depth() -> usize {
 /// Minimum joint reach (relative to the root) for a node to become an exercise.
 pub const MIN_EXERCISE_REACH: f32 = 0.02;
 
-/// Theme assignment from the node shape (who acts, facing a bet or not).
+fn is_street_marker(l: &str) -> bool {
+    l.starts_with("Turn: ") || l.starts_with("River: ")
+}
+
+/// Splits the readable line into (previous street actions, current street actions).
+fn street_segments(line: &[String]) -> (Vec<&str>, Vec<&str>) {
+    let marks: Vec<usize> = (0..line.len())
+        .filter(|&i| is_street_marker(&line[i]))
+        .collect();
+    match marks.as_slice() {
+        [] => (vec![], line.iter().map(String::as_str).collect()),
+        [.., last] => {
+            let prev_start = if marks.len() >= 2 {
+                marks[marks.len() - 2] + 1
+            } else {
+                0
+            };
+            (
+                line[prev_start..*last].iter().map(String::as_str).collect(),
+                line[last + 1..].iter().map(String::as_str).collect(),
+            )
+        }
+    }
+}
+
+/// Theme assignment from the node shape: street, how the previous street went, who acts and
+/// whether they face a bet or a raise. Flop keys are unchanged from pack 1.0.0.
 pub fn theme_for(node: &NodeSolution, spot: &SpotConfig) -> Option<(String, String, u8)> {
     if node.actions.len() < 2 {
         return None; // forced action, not a decision
@@ -47,34 +77,46 @@ pub fn theme_for(node: &NodeSolution, spot: &SpotConfig) -> Option<(String, Stri
     }
     let pos = &node.position;
     let street = node.street.label_pt();
-    let facing_raise = node.line.iter().any(|l| l.contains("aumenta"));
+    let (prev, cur) = street_segments(&node.line);
+    let facing_raise = cur
+        .iter()
+        .any(|l| l.contains("aumenta") || l.contains("all-in"));
     let is_ip = *pos == spot.ip_position;
-    let (key, label, level) = if node.to_call_chips == 0 {
+    let (key, what, level) = if node.to_call_chips == 0 {
         if is_ip {
-            (
-                "ip_bet_or_check",
-                format!("{pos} no {street}: apostar ou passar após check"),
-                1,
-            )
+            ("ip_bet_or_check", "apostar ou passar após check", 1u8)
         } else {
-            (
-                "oop_lead",
-                format!("{pos} no {street}: liderar ou passar"),
-                1,
-            )
+            ("oop_lead", "liderar ou passar", 1)
         }
     } else if facing_raise {
-        (
-            "vs_raise",
-            format!("{pos} no {street}: enfrentar aumento"),
-            3,
-        )
+        ("vs_raise", "enfrentar aumento", 3)
     } else {
-        ("vs_bet", format!("{pos} no {street}: enfrentar aposta"), 2)
+        ("vs_bet", "enfrentar aposta", 2)
+    };
+    let (prior_key, prior_label) = if node.street == poker_core::spot::Street::Flop {
+        ("", String::new())
+    } else if prev
+        .iter()
+        .any(|l| l.contains("aposta") || l.contains("aumenta"))
+    {
+        ("_after_bet", " após aposta paga".to_string())
+    } else {
+        ("_after_check", " após check-check".to_string())
+    };
+    let level = match node.street {
+        poker_core::spot::Street::Flop => level,
+        poker_core::spot::Street::Turn => (level + 1).min(3),
+        poker_core::spot::Street::River => 3,
     };
     Some((
-        format!("{}_{}_{}", spot.pot_type.to_lowercase(), street, key),
-        label,
+        format!(
+            "{}_{}{}_{}",
+            spot.pot_type.to_lowercase(),
+            street,
+            prior_key,
+            key
+        ),
+        format!("{pos} no {street}{prior_label}: {what}"),
         level,
     ))
 }
@@ -96,7 +138,11 @@ pub fn exercises_for(sol: &SolutionFile) -> Vec<ExerciseDef> {
                 position: n.position.clone(),
                 pot_type: sol.spot.pot_type.clone(),
                 board: sol.spot.board.clone(),
-                textures: textures.clone(),
+                textures: textures
+                    .iter()
+                    .cloned()
+                    .chain(n.runout.iter().cloned())
+                    .collect(),
                 level,
             })
         })
@@ -123,6 +169,11 @@ pub fn generate(config_path: &Path, out_dir: &Path, only: Option<usize>) -> Resu
     std::fs::create_dir_all(&sol_dir)?;
 
     let boards: Vec<&String> = cfg.boards.iter().take(only.unwrap_or(usize::MAX)).collect();
+    let plan = cfg
+        .export
+        .clone()
+        .unwrap_or_else(|| solver_adapter::ExportPlan::initial_only(cfg.export_depth));
+    let plan_sig = serde_json::to_string(&plan)?;
     let mut files = Vec::new();
     let mut exercises = Vec::new();
     let mut solves = Vec::new();
@@ -131,9 +182,12 @@ pub fn generate(config_path: &Path, out_dir: &Path, only: Option<usize>) -> Resu
         let rel = format!("solutions/{}-v{}.json.gz", spot.id, spot.version);
         let path = out_dir.join(&rel);
         let hash = spot.config_hash(solver_adapter::ENGINE_REV);
-        // Cache: reuse an existing solution with identical canonical config + engine revision.
+        // Cache: reuse an existing solution with identical canonical config, engine revision
+        // and export plan.
         let sol = match SolutionFile::load(&path) {
-            Ok(s) if s.config_hash == hash => {
+            Ok(s)
+                if s.config_hash == hash && s.export_plan.as_deref() == Some(plan_sig.as_str()) =>
+            {
                 eprintln!(
                     "[{}/{}] {board}: cache válido, reutilizando",
                     k + 1,
@@ -154,7 +208,7 @@ pub fn generate(config_path: &Path, out_dir: &Path, only: Option<usize>) -> Resu
                         );
                     }
                 })?;
-                let s = solver_adapter::build_solution_file(&mut solved, &spot, cfg.export_depth)?;
+                let s = solver_adapter::build_solution_file_with_plan(&mut solved, &spot, &plan)?;
                 s.save(&path)?;
                 s
             }

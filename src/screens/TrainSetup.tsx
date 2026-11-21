@@ -49,6 +49,9 @@ export function TrainSetup({ nav, mode: initialMode }: { nav: Nav; mode: Mode })
             Tema
             <select value={theme} onChange={(e) => setTheme(e.target.value)}>
               <option value="">Todos os temas</option>
+              <option value="street:flop">Todos do flop</option>
+              <option value="street:turn">Todos do turn</option>
+              <option value="street:river">Todos do river</option>
               {themes.map((t) => (
                 <option key={t.theme} value={t.theme}>
                   {t.label} ({t.exercises} pontos)
