@@ -48,7 +48,7 @@ jobs:
       - name: Frontend tests
         run: npm test
       - name: Build installer (unsigned, no updater artifacts)
-        run: npx tauri build --config "{\"bundle\":{\"createUpdaterArtifacts\":false}}"
+        run: npx tauri build --config src-tauri/tauri.ci.conf.json
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: installer-pr-${{ github.sha }}

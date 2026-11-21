@@ -74,7 +74,7 @@ npx tauri dev
 npx tauri build
 ```
 
-O build com `createUpdaterArtifacts` exige `TAURI_SIGNING_PRIVATE_KEY` (use a chave **dev** gerada por `npx tauri signer generate -w .keys/updater-dev.key`, que fica fora do git) ou desative: `npx tauri build --config "{\"bundle\":{\"createUpdaterArtifacts\":false}}"`.
+O build com `createUpdaterArtifacts` exige `TAURI_SIGNING_PRIVATE_KEY` (use a chave **dev** gerada por `npx tauri signer generate -w .keys/updater-dev.key`, que fica fora do git) ou desative: `npx tauri build --config src-tauri/tauri.ci.conf.json`.
 
 E2E da interface no app instalado (treina, fecha, reabre, confere histórico):
 
