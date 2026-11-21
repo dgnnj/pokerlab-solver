@@ -1071,39 +1071,33 @@ impl Trainer {
     }
 
     pub fn export_csv(&self, path: &Path) -> R<usize> {
-        let mut st = self.db.conn.prepare(
-            "SELECT a.id, a.created_at, a.session_id, a.sampling_mode, a.pack_id, a.pack_version, a.engine_rev, a.exercise_id,
-                    a.theme, a.street, a.position, a.pot_type, a.board, a.textures, a.combo, a.chosen_label, a.best_label,
-                    a.best_ev_chips, a.chosen_ev_chips, a.loss_bb, a.loss_pct_pot, a.grade, a.chosen_frequency, a.decision_ms
-             FROM attempts a ORDER BY a.id",
-        )?;
-        let cols = st.column_count();
-        let mut out = String::from(
-            "id,created_at,session_id,sampling_mode,pack_id,pack_version,engine_rev,exercise_id,theme,street,position,pot_type,board,textures,combo,chosen,best,best_ev_chips,chosen_ev_chips,loss_bb,loss_pct_pot,grade,chosen_frequency,decision_ms\n",
-        );
-        let mut rows = st.query([])?;
-        let mut n = 0;
-        while let Some(r) = rows.next()? {
-            let mut fields = Vec::with_capacity(cols);
-            for i in 0..cols {
-                let v: rusqlite::types::Value = r.get(i)?;
-                let s = match v {
-                    rusqlite::types::Value::Null => String::new(),
-                    rusqlite::types::Value::Integer(x) => x.to_string(),
-                    rusqlite::types::Value::Real(x) => format!("{x}"),
-                    rusqlite::types::Value::Text(t) => t,
-                    rusqlite::types::Value::Blob(_) => String::new(),
-                };
-                fields.push(if s.contains([',', '"', '\n']) {
-                    format!("\"{}\"", s.replace('"', "\"\""))
-                } else {
-                    s
-                });
-            }
-            out.push_str(&fields.join(","));
-            out.push('\n');
-            n += 1;
-        }
+        const COLUMNS: &[(&str, &str)] = &[
+            ("id", "id"),
+            ("created_at", "created_at"),
+            ("session_id", "session_id"),
+            ("sampling_mode", "sampling_mode"),
+            ("pack_id", "pack_id"),
+            ("pack_version", "pack_version"),
+            ("engine_rev", "engine_rev"),
+            ("exercise_id", "exercise_id"),
+            ("theme", "theme"),
+            ("street", "street"),
+            ("position", "position"),
+            ("pot_type", "pot_type"),
+            ("board", "board"),
+            ("textures", "textures"),
+            ("combo", "combo"),
+            ("chosen_label", "chosen"),
+            ("best_label", "best"),
+            ("best_ev_chips", "best_ev_chips"),
+            ("chosen_ev_chips", "chosen_ev_chips"),
+            ("loss_bb", "loss_bb"),
+            ("loss_pct_pot", "loss_pct_pot"),
+            ("grade", "grade"),
+            ("chosen_frequency", "chosen_frequency"),
+            ("decision_ms", "decision_ms"),
+        ];
+        let (out, n) = self.db.query_csv(COLUMNS, "FROM attempts ORDER BY id")?;
         poker_core::solution::write_atomic(path, out.as_bytes())?;
         Ok(n)
     }

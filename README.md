@@ -122,6 +122,7 @@ O pacote só guarda as linhas principais, então a mão inteira usa a árvore co
 - Mãos privadas sorteadas juntas pelos pesos dos ranges, sem cartas em comum; o adversário sorteia cada ação pela estratégia da mão dele no nó; turn e river saem do baralho restante. All-in pago antes do river é nó terminal no motor (ele faz a média dos runouts), então o app distribui as cartas restantes para o showdown.
 - Cada decisão é avaliada pela perda de EV no mesmo nó e mão. Se a sua linha leva a mão a peso praticamente nulo na solução (< 0,001% do peso inicial), a nota termina na última decisão avaliável e o motivo aparece.
 - Resultado no pós-flop (o pote inicial conta para quem leva) separado da qualidade das decisões. Histórico em `hands` / `hand_decisions` (schema v2; migração com backup).
+- Exportar mãos completas (CSV), no histórico de mãos ou em Configurações: grava `exports\pokerlab-maos-<timestamp>.csv` com uma linha por decisão do aluno e os dados da mão repetidos em cada linha (cartas dos dois, board final, linha, vencedor, resultado, nota, EVs, frequência, equidade, motivo de corte). Mão interrompida antes da primeira decisão sai com uma linha e as colunas da decisão vazias; `ended_at` vazio indica mão interrompida.
 
 ## Dados do usuário
 

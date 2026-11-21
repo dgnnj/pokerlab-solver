@@ -198,6 +198,7 @@ export function Hand({ nav }: { nav: Nav }) {
   const [fbMode, setFbMode] = useState<FeedbackMode>(memo.fbMode);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [exported, setExported] = useState<string | null>(null);
   const shownAt = useRef(performance.now());
 
   memo.solutionId = solutionId;
@@ -584,6 +585,21 @@ export function Hand({ nav }: { nav: Nav }) {
             Resultado em bb no pós-flop (o pote inicial de 5,5 bb conta para quem leva a mão). Perda de EV somada nas decisões
             avaliadas, com o número de decisões avaliadas/total.
           </p>
+          <div className="row">
+            <button
+              onClick={() =>
+                void api
+                  .exportHandsCsv()
+                  .then(setExported)
+                  .catch((e) => setErr(errorText(e)))
+              }
+            >
+              Exportar mãos completas (CSV)
+            </button>
+          </div>
+          {exported && (
+            <p className="small">{exported}</p>
+          )}
         </>
       ) : (
         <p className="muted">Nenhuma mão jogada ainda.</p>

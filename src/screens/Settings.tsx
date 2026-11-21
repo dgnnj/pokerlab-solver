@@ -80,6 +80,9 @@ export function Settings({ nav }: { nav: Nav }) {
         <button disabled={busy} onClick={() => run(api.exportCsv)}>
           Exportar histórico (CSV)
         </button>
+        <button disabled={busy} onClick={() => run(api.exportHandsCsv)}>
+          Exportar mãos completas (CSV)
+        </button>
         <button disabled={busy} onClick={() => run(async () => `Backup criado em ${await api.backupNow()}`)}>
           Criar backup do banco
         </button>

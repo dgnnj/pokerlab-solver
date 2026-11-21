@@ -32,6 +32,7 @@
     "allow-hand-act",
     "allow-hand-view",
     "allow-hand-history",
+    "allow-export-hands-csv",
     "allow-check-update",
     "allow-install-update"
   ]

@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 
 use poker_core::spot::SpotConfig;
 use pokerlab_lib::db::Db;
-use pokerlab_lib::handplay::{history, BoardSource, EngineStatus, HandEngine};
+use pokerlab_lib::handplay::{export_csv, history, BoardSource, EngineStatus, HandEngine};
 
 fn source(name: &str, id: &str) -> BoardSource {
     let p = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(format!("../data/spots/{name}"));
@@ -134,4 +134,74 @@ fn hands_are_played_against_the_engine_and_persisted() {
         .recent
         .iter()
         .all(|r| r.ended_at.is_some() && r.line.is_some()));
+
+    // CSV export: one row per decision, plus one row for a hand interrupted before any decision.
+    let interrupted = engine.start(&db, "BB").unwrap();
+    assert!(!interrupted.finished);
+    let out = dir.path().join("exports").join("maos.csv");
+    let (hands, rows) = export_csv(&db, &out).unwrap();
+    assert_eq!(hands, 7);
+    assert_eq!(rows, decisions + 1);
+    let text = std::fs::read_to_string(&out).unwrap();
+    let table: Vec<Vec<String>> = text.lines().map(csv_fields).collect();
+    let header = &table[0];
+    assert_eq!(table.len(), rows + 1);
+    assert!(
+        table.iter().all(|r| r.len() == header.len()),
+        "colunas desalinhadas"
+    );
+    let col = |name: &str| header.iter().position(|h| h == name).unwrap();
+    let (hand_id, seq, ended, grade, loss) = (
+        col("hand_id"),
+        col("decision_seq"),
+        col("ended_at"),
+        col("grade"),
+        col("loss_bb"),
+    );
+    let last = table.last().unwrap();
+    assert!(
+        last[ended].is_empty() && last[seq].is_empty(),
+        "mão interrompida sem decisão"
+    );
+    // Each finished hand's rows carry its decisions in order and its total loss.
+    for v in &finished {
+        let id = db
+            .conn
+            .query_row("SELECT id FROM hands WHERE token = ?1", [&v.token], |r| {
+                r.get::<_, i64>(0)
+            })
+            .unwrap()
+            .to_string();
+        let mine: Vec<&Vec<String>> = table[1..].iter().filter(|r| r[hand_id] == id).collect();
+        assert_eq!(mine.len(), v.decisions.len());
+        for (i, r) in mine.iter().enumerate() {
+            assert_eq!(r[seq], i.to_string());
+            assert!(!r[ended].is_empty());
+            assert_eq!(r[grade].is_empty(), v.decisions[i].feedback.is_none());
+        }
+        let sum: f64 = mine
+            .iter()
+            .filter_map(|r| r[loss].parse::<f64>().ok())
+            .sum();
+        assert!((sum - v.summary.total_loss_bb).abs() < 1e-6);
+    }
+}
+
+/// Minimal RFC 4180 field splitter for one line (no embedded newlines in this export).
+fn csv_fields(line: &str) -> Vec<String> {
+    let mut out = vec![String::new()];
+    let mut quoted = false;
+    let mut chars = line.chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            '"' if quoted && chars.peek() == Some(&'"') => {
+                chars.next();
+                out.last_mut().unwrap().push('"');
+            }
+            '"' => quoted = !quoted,
+            ',' if !quoted => out.push(String::new()),
+            c => out.last_mut().unwrap().push(c),
+        }
+    }
+    out
 }

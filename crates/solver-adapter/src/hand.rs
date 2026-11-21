@@ -438,10 +438,9 @@ impl HandSim {
         if reach < MIN_HERO_REACH {
             let reason = format!(
                 "Na solução, {} praticamente nunca chega a este ponto pela linha que você jogou \
-                 (frequência acumulada {:.6}%). O motor não tem estratégia confiável para esta \
-                 mão a partir daqui; a nota termina na última decisão avaliável.",
-                self.hero_combo,
-                reach * 100.0
+                 (frequência acumulada abaixo de 0,001%). O motor não tem estratégia confiável \
+                 para esta mão a partir daqui; a nota termina na última decisão avaliável.",
+                self.hero_combo
             );
             self.cut = Some(reason.clone());
             return Ok((None, None, Some(reason)));

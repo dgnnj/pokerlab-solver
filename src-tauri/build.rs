@@ -26,6 +26,7 @@ const COMMANDS: &[&str] = &[
     "hand_act",
     "hand_view",
     "hand_history",
+    "export_hands_csv",
     "check_update",
     "install_update",
 ];

@@ -836,3 +836,64 @@ pub fn history(db: &Db, limit: i64) -> R<HandHistory> {
         recent,
     })
 }
+
+/// CSV columns of the full-hand export: one row per hero decision, with the hand's data repeated
+/// on each row (hands with no decision yet, e.g. interrupted right after the deal, get one row
+/// with empty decision columns). An empty `ended_at` marks an interrupted hand.
+const HAND_CSV_COLUMNS: &[(&str, &str)] = &[
+    ("h.id", "hand_id"),
+    ("h.started_at", "started_at"),
+    ("h.ended_at", "ended_at"),
+    ("h.pack_id", "pack_id"),
+    ("h.pack_version", "pack_version"),
+    ("h.engine_rev", "engine_rev"),
+    ("h.solution_id", "solution_id"),
+    ("h.same_config_as_pack", "same_config_as_pack"),
+    ("h.solve_exploitability_pct", "solve_exploitability_pct"),
+    ("h.hero_position", "hero_position"),
+    ("h.villain_position", "villain_position"),
+    ("h.hero_combo", "hero_combo"),
+    ("h.villain_combo", "villain_combo"),
+    ("h.flop", "flop"),
+    ("h.final_board", "final_board"),
+    ("h.line", "line"),
+    ("h.showdown", "showdown"),
+    ("h.winner", "winner"),
+    ("h.pot_chips", "final_pot_chips"),
+    ("h.hero_net_bb", "hero_net_bb"),
+    ("h.decisions", "hand_decisions"),
+    ("h.graded", "hand_graded"),
+    ("h.total_loss_bb", "hand_total_loss_bb"),
+    ("h.cut_reason", "cut_reason"),
+    ("d.seq", "decision_seq"),
+    ("d.created_at", "decision_at"),
+    ("d.node_id", "node_id"),
+    ("d.street", "street"),
+    ("d.board", "board"),
+    ("d.pot_chips", "pot_chips"),
+    ("d.chosen_label", "chosen"),
+    ("d.best_label", "best"),
+    ("d.best_ev_chips", "best_ev_chips"),
+    ("d.chosen_ev_chips", "chosen_ev_chips"),
+    ("d.loss_bb", "loss_bb"),
+    ("d.loss_pct_pot", "loss_pct_pot"),
+    ("d.grade", "grade"),
+    ("d.chosen_frequency", "chosen_frequency"),
+    ("d.equity", "equity"),
+    ("d.not_evaluable", "not_evaluable"),
+    ("d.decision_ms", "decision_ms"),
+];
+
+/// Writes every full hand and its decisions to `path` (see [`HAND_CSV_COLUMNS`]). Returns
+/// `(hands, rows)`.
+pub fn export_csv(db: &Db, path: &std::path::Path) -> R<(usize, usize)> {
+    let (out, rows) = db.query_csv(
+        HAND_CSV_COLUMNS,
+        "FROM hands h LEFT JOIN hand_decisions d ON d.hand_id = h.id ORDER BY h.id, d.seq",
+    )?;
+    let hands: i64 = db
+        .conn
+        .query_row("SELECT COUNT(*) FROM hands", [], |r| r.get(0))?;
+    poker_core::solution::write_atomic(path, out.as_bytes())?;
+    Ok((hands as usize, rows))
+}

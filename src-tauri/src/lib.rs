@@ -331,6 +331,21 @@ fn hand_history(state: State<AppState>, limit: Option<i64>) -> CmdResult<handpla
     with_trainer(&state, |t| handplay::history(&t.db, limit.unwrap_or(30)))
 }
 
+#[tauri::command]
+fn export_hands_csv(state: State<AppState>) -> CmdResult<String> {
+    let path = state
+        .data_dir
+        .join("exports")
+        .join(format!("pokerlab-maos-{}.csv", db::unix_now()));
+    with_trainer(&state, |t| {
+        let (hands, rows) = handplay::export_csv(&t.db, &path)?;
+        Ok(format!(
+            "{hands} mãos ({rows} linhas, uma por decisão) exportadas para {}",
+            path.display()
+        ))
+    })
+}
+
 fn init_trainer(
     app: &tauri::AppHandle,
     data_dir: &std::path::Path,
@@ -452,6 +467,7 @@ pub fn run() {
             hand_act,
             hand_view,
             hand_history,
+            export_hands_csv,
             updater::check_update,
             updater::install_update,
         ])
