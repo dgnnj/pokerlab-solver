@@ -148,6 +148,30 @@ pub fn select_runout_cards(board: &[Card], dead: u64, n: usize) -> Vec<(Card, Ru
     out
 }
 
+/// Category of an actual dealt card (full-hand simulation), same precedence as the selection:
+/// flush, overcard, pairs the top card, low, middle; anything else (e.g. pairs a lower card) is
+/// `Other`.
+pub fn kind_of(board: &[Card], c: Card) -> RunoutKind {
+    match classify(board, c) {
+        (true, ..) => RunoutKind::Flush,
+        (_, true, ..) => RunoutKind::Over,
+        (_, _, true, ..) => RunoutKind::PairTop,
+        (_, _, _, true, _) => RunoutKind::Low,
+        (_, _, _, _, true) => RunoutKind::Middle,
+        _ => RunoutKind::Other,
+    }
+}
+
+/// Label of an actual dealt card: like [`describe`], with "pareia o board" for `Other` cards that
+/// pair a lower board card.
+pub fn describe_dealt(c: Card, board: &[Card]) -> String {
+    let k = kind_of(board, c);
+    if k == RunoutKind::Other && board.iter().any(|&b| rank_of(b) == rank_of(c)) {
+        return format!("{} (pareia o board)", card_to_string(c));
+    }
+    describe(c, k, board)
+}
+
 /// Readable runout label. For flush cards the label states how many cards of that suit the board
 /// now has (3ª, 4ª, 5ª), which depends on the board the card is dealt to.
 pub fn describe(c: Card, k: RunoutKind, board: &[Card]) -> String {

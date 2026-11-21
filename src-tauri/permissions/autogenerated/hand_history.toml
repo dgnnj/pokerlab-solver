@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-hand-history"
+description = "Enables the hand_history command without any pre-configured scope."
+commands.allow = ["hand_history"]
+
+[[permission]]
+identifier = "deny-hand-history"
+description = "Denies the hand_history command without any pre-configured scope."
+commands.deny = ["hand_history"]

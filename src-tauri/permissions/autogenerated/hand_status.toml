@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-hand-status"
+description = "Enables the hand_status command without any pre-configured scope."
+commands.allow = ["hand_status"]
+
+[[permission]]
+identifier = "deny-hand-status"
+description = "Denies the hand_status command without any pre-configured scope."
+commands.deny = ["hand_status"]

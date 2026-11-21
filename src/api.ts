@@ -220,6 +220,150 @@ export interface StudyEntry {
   line: string[];
 }
 
+export interface BoardOption {
+  solution_id: string;
+  board: string;
+  textures: string[];
+  pack_exploitability_pct: number;
+  pack_solve_ms: number;
+  memory_mib: number;
+}
+
+export type EngineStatus =
+  | { state: "idle" }
+  | {
+      state: "solving";
+      solution_id: string;
+      board: string;
+      iteration: number;
+      max_iterations: number;
+      exploitability_pct: number | null;
+      target_pct: number;
+      elapsed_ms: number;
+    }
+  | {
+      state: "ready";
+      solution_id: string;
+      board: string;
+      exploitability_pct: number;
+      pack_exploitability_pct: number;
+      solve_ms: number;
+      memory_mib: number;
+      compressed: boolean;
+      same_config_as_pack: boolean;
+      threads: number;
+    }
+  | { state: "failed"; solution_id: string; board: string; error: string };
+
+export interface HandEvent {
+  street: string;
+  kind: "action" | "card";
+  hero: boolean;
+  label: string;
+  pot_bb: number;
+}
+
+export interface HandDecision {
+  seq: number;
+  street: string;
+  board: string[];
+  line: string[];
+  pot_bb: number;
+  to_call_bb: number;
+  actions: ActionOption[];
+  chosen_index: number;
+  chosen_label: string;
+  feedback: Feedback | null;
+  grade_label: string | null;
+  explanation: string[];
+  equity: number | null;
+  tolerance_bb: number | null;
+  not_evaluable: string | null;
+}
+
+export interface HandOutcome {
+  showdown: boolean;
+  folded: string | null;
+  winner: "hero" | "villain" | "split";
+  pot_bb: number;
+  rake_bb: number;
+  hero_invested_bb: number;
+  hero_net_bb: number;
+  hero_total_bb: number | null;
+  hero_hand: string | null;
+  villain_hand: string | null;
+  summary: string;
+}
+
+export interface HandSummary {
+  decisions: number;
+  graded: number;
+  total_loss_bb: number;
+  avg_loss_bb: number;
+  grades: Record<string, number>;
+}
+
+export interface HandView {
+  token: string;
+  finished: boolean;
+  solution_id: string;
+  hero_position: string;
+  villain_position: string;
+  hero_cards: [string, string];
+  villain_cards: [string, string] | null;
+  board: string[];
+  street: string;
+  pot_bb: number;
+  to_call_bb: number;
+  hero_stack_bb: number;
+  villain_stack_bb: number;
+  preflop_line: string;
+  events: HandEvent[];
+  actions: ActionOption[];
+  decisions: HandDecision[];
+  outcome: HandOutcome | null;
+  cut: string | null;
+  summary: HandSummary;
+  started_at: string;
+}
+
+export interface HandRow {
+  id: number;
+  started_at: string;
+  ended_at: string | null;
+  hero_position: string;
+  hero_combo: string;
+  villain_combo: string;
+  flop: string;
+  final_board: string | null;
+  line: string | null;
+  winner: string | null;
+  showdown: boolean | null;
+  hero_net_bb: number | null;
+  decisions: number;
+  graded: number;
+  total_loss_bb: number;
+  cut_reason: string | null;
+  pack_version: string;
+}
+
+export interface HandStats {
+  hands: number;
+  finished: number;
+  net_bb: number;
+  decisions: number;
+  graded: number;
+  total_loss_bb: number;
+  avg_loss_per_decision_bb: number;
+  avg_loss_per_hand_bb: number;
+}
+
+export interface HandHistory {
+  stats: HandStats;
+  by_position: [string, HandStats][];
+  recent: HandRow[];
+}
+
 export interface UpdateCheck {
   status: "up_to_date" | "available" | "unconfigured" | "error";
   current_version: string;
@@ -255,6 +399,15 @@ export const api = {
   backupNow: () => invoke<string>("backup_now"),
   getPref: (key: string) => invoke<string | null>("get_pref", { key }),
   setPref: (key: string, value: string) => invoke<void>("set_pref", { key, value }),
+  handBoards: () => invoke<BoardOption[]>("hand_boards"),
+  handPrepare: (solutionId: string) => invoke<EngineStatus>("hand_prepare", { solutionId }),
+  handStatus: () => invoke<EngineStatus>("hand_status"),
+  handCancel: () => invoke<EngineStatus>("hand_cancel"),
+  handStart: (hero: string) => invoke<HandView>("hand_start", { hero }),
+  handAct: (token: string, action: number, decisionMs: number) =>
+    invoke<HandView>("hand_act", { token, action, decisionMs }),
+  handView: (token: string) => invoke<HandView>("hand_view", { token }),
+  handHistory: (limit?: number) => invoke<HandHistory>("hand_history", { limit }),
   checkUpdate: () => invoke<UpdateCheck>("check_update"),
   installUpdate: (onEvent: (e: DownloadEvent) => void) => {
     const ch = new Channel<DownloadEvent>();

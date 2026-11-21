@@ -19,8 +19,13 @@ use poker_core::spot::{SpotConfig, Street};
 use poker_core::{fmt_bb, now_iso8601};
 use postflop_solver::{
     compute_exploitability, finalize, solve_step, Action, ActionTree, BetSizeOptions, BoardState,
-    CardConfig, DonkSizeOptions, PostFlopGame, Range, TreeConfig, NOT_DEALT,
+    CardConfig, DonkSizeOptions, Range, TreeConfig, NOT_DEALT,
 };
+
+pub mod hand;
+
+/// Solved game handle, re-exported so callers never depend on the engine crate directly.
+pub use postflop_solver::PostFlopGame;
 
 pub const ENGINE_NAME: &str = "postflop-solver";
 /// Must match the `rev` pinned in the workspace Cargo.toml.
@@ -200,7 +205,7 @@ pub fn solve_spot(
     Ok(SolvedGame { game, info })
 }
 
-fn seat_position(spot: &SpotConfig, player: usize) -> String {
+pub(crate) fn seat_position(spot: &SpotConfig, player: usize) -> String {
     if player == 0 {
         spot.oop_position.clone()
     } else {
@@ -264,7 +269,7 @@ pub fn describe_actions(game: &PostFlopGame, spot: &SpotConfig) -> Vec<ActionInf
         .collect()
 }
 
-fn action_code(a: &ActionInfo) -> String {
+pub(crate) fn action_code(a: &ActionInfo) -> String {
     match a.kind {
         ActionKind::Fold => "f".into(),
         ActionKind::Check => "x".into(),
@@ -275,7 +280,7 @@ fn action_code(a: &ActionInfo) -> String {
     }
 }
 
-fn line_label(position: &str, a: &ActionInfo, cpb: i32) -> String {
+pub(crate) fn line_label(position: &str, a: &ActionInfo, cpb: i32) -> String {
     match a.kind {
         ActionKind::Fold => format!("{position} desiste"),
         ActionKind::Check => format!("{position} passa"),

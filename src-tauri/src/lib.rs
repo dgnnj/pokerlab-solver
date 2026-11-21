@@ -1,6 +1,7 @@
 //! PokerLab desktop app (Tauri 2). Typed commands over the trainer, SQLite and the updater.
 
 pub mod db;
+pub mod handplay;
 pub mod trainer;
 mod updater;
 
@@ -19,6 +20,7 @@ pub const BUNDLED_PACK: &str = "btn-vs-bb-srp-100bb";
 
 pub struct AppState {
     pub trainer: Mutex<Option<Trainer>>,
+    pub hands: handplay::HandEngine,
     pub startup_error: Mutex<Option<String>>,
     pub data_dir: PathBuf,
     pub health: Mutex<HealthInfo>,
@@ -239,6 +241,96 @@ fn set_pref(state: State<AppState>, key: String, value: String) -> CmdResult<()>
     with_trainer(&state, |t| Ok(t.db.set_pref(&key, &value)?))
 }
 
+#[derive(Serialize)]
+struct BoardOption {
+    solution_id: String,
+    board: String,
+    textures: Vec<String>,
+    pack_exploitability_pct: f64,
+    pack_solve_ms: u64,
+    memory_mib: u64,
+}
+
+#[tauri::command]
+fn hand_boards(state: State<AppState>) -> CmdResult<Vec<BoardOption>> {
+    with_trainer(&state, |t| {
+        let mut v: Vec<BoardOption> = t
+            .pack
+            .solutions
+            .values()
+            .map(|s| BoardOption {
+                solution_id: s.solution_id.clone(),
+                board: s.spot.board.clone(),
+                textures: poker_core::cards::parse_board(&s.spot.board)
+                    .map(|b| poker_core::texture::flop_texture_tags(&b))
+                    .unwrap_or_default(),
+                pack_exploitability_pct: s.solve.final_exploitability_pct_pot,
+                pack_solve_ms: s.solve.solve_ms,
+                memory_mib: s.solve.memory_estimate_bytes >> 20,
+            })
+            .collect();
+        v.sort_by(|a, b| a.board.cmp(&b.board));
+        Ok(v)
+    })
+}
+
+#[tauri::command]
+fn hand_prepare(state: State<AppState>, solution_id: String) -> CmdResult<handplay::EngineStatus> {
+    let src = with_trainer(&state, |t| {
+        let s = t
+            .pack
+            .solutions
+            .get(&solution_id)
+            .ok_or_else(|| TrainerError::Msg(format!("solução desconhecida: {solution_id}")))?;
+        Ok(handplay::BoardSource {
+            solution_id: s.solution_id.clone(),
+            spot: s.spot.clone(),
+            pack_config_hash: s.config_hash.clone(),
+            pack_exploitability_pct: s.solve.final_exploitability_pct_pot,
+            pack_id: t.pack.manifest.pack_id.clone(),
+            pack_version: t.pack.manifest.version.clone(),
+        })
+    })?;
+    state.hands.prepare(src)
+}
+
+#[tauri::command]
+fn hand_status(state: State<AppState>) -> CmdResult<handplay::EngineStatus> {
+    state.hands.status()
+}
+
+#[tauri::command]
+fn hand_cancel(state: State<AppState>) -> CmdResult<handplay::EngineStatus> {
+    state.hands.cancel()
+}
+
+#[tauri::command]
+fn hand_start(state: State<AppState>, hero: String) -> CmdResult<handplay::HandView> {
+    with_trainer(&state, |t| state.hands.start(&t.db, &hero))
+}
+
+#[tauri::command]
+fn hand_act(
+    state: State<AppState>,
+    token: String,
+    action: usize,
+    decision_ms: Option<i64>,
+) -> CmdResult<handplay::HandView> {
+    with_trainer(&state, |t| {
+        state.hands.act(&t.db, &token, action, decision_ms)
+    })
+}
+
+#[tauri::command]
+fn hand_view(state: State<AppState>, token: String) -> CmdResult<handplay::HandView> {
+    state.hands.view(&token)
+}
+
+#[tauri::command]
+fn hand_history(state: State<AppState>, limit: Option<i64>) -> CmdResult<handplay::HandHistory> {
+    with_trainer(&state, |t| handplay::history(&t.db, limit.unwrap_or(30)))
+}
+
 fn init_trainer(
     app: &tauri::AppHandle,
     data_dir: &std::path::Path,
@@ -320,8 +412,13 @@ pub fn run() {
                     format!("{} {e}\n", db::now()),
                 );
             }
+            let seed = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos() as u64)
+                .unwrap_or(11);
             app.manage(AppState {
                 trainer: Mutex::new(trainer),
+                hands: handplay::HandEngine::new(seed.rotate_left(17)),
                 startup_error: Mutex::new(err),
                 data_dir,
                 health: Mutex::new(health),
@@ -347,6 +444,14 @@ pub fn run() {
             backup_now,
             get_pref,
             set_pref,
+            hand_boards,
+            hand_prepare,
+            hand_status,
+            hand_cancel,
+            hand_start,
+            hand_act,
+            hand_view,
+            hand_history,
             updater::check_update,
             updater::install_update,
         ])

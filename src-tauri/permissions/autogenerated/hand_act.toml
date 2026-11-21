@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-hand-act"
+description = "Enables the hand_act command without any pre-configured scope."
+commands.allow = ["hand_act"]
+
+[[permission]]
+identifier = "deny-hand-act"
+description = "Denies the hand_act command without any pre-configured scope."
+commands.deny = ["hand_act"]

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0 — 2026-11-21
+- Mão completa: jogar do flop ao river contra a estratégia do motor. O app resolve a árvore completa do flop escolhido em segundo plano (progresso, cancelamento, mesma configuração do pacote) e mantém um board na memória; mãos sorteadas juntas pelos ranges, adversário pela estratégia da mão dele, turn/river sem reposição, runout distribuído após all-in, showdown com ranking próprio de mãos.
+- Nota por decisão (perda de EV), opção de ver as notas só no fim da mão, revisão das decisões, corte explicado quando a linha tem peso nulo na solução. Resultado da mão separado da perda de EV.
+- Histórico de mãos (banco schema v2, migração com backup automático) com resultado, perda média por decisão e por posição.
+
 ## 0.2.0 — 2026-11-21
 - Exercícios de turn e river: pacote `btn-vs-bb-srp-100bb` v1.1.0 exporta, para cada flop, as linhas check-check, c-bet pequena paga e c-bet grande paga com 5 cartas de turn representativas (traz 3ª do naipe, overcard, pareia a carta alta, baixa, do meio) e, nas duas primeiras, o river após check-check e aposta paga no turn com 3 cartas representativas. Ranges de cada ponto são os do motor para a linha jogada.
 - Temas separados por rua e pelo que aconteceu na rua anterior ("após check-check", "após aposta paga").

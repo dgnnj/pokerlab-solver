@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { actionClass, bb, cardFace, formatLine, freq, pct } from "./format";
+import { actionClass, bb, cardFace, formatLine, freq, pct, signedBb } from "./format";
 
 describe("format", () => {
   it("formats big blinds with comma", () => {
     expect(bb(1.82)).toBe("1,82 bb");
     expect(bb(0.001, 3)).toBe("0,001 bb");
+  });
+  it("formats signed results", () => {
+    expect(signedBb(3)).toBe("+3,00 bb");
+    expect(signedBb(-1.5)).toBe("−1,50 bb");
+    expect(signedBb(-0.001)).toBe("0,00 bb");
   });
   it("formats percentages", () => {
     expect(pct(33.333)).toBe("33,3%");

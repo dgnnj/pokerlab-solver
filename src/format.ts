@@ -4,6 +4,13 @@ export function bb(v: number, digits = 2): string {
   return `${v.toLocaleString("pt-BR", { minimumFractionDigits: digits, maximumFractionDigits: digits })} bb`;
 }
 
+/** Signed bb amount: "+3,00 bb", "−1,50 bb", "0,00 bb". */
+export function signedBb(v: number, digits = 2): string {
+  const r = Number(v.toFixed(digits));
+  if (r === 0) return bb(0, digits);
+  return `${r > 0 ? "+" : "−"}${bb(Math.abs(r), digits)}`;
+}
+
 export function pct(v: number, digits = 1): string {
   return `${v.toLocaleString("pt-BR", { minimumFractionDigits: digits, maximumFractionDigits: digits })}%`;
 }

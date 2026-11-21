@@ -3,6 +3,7 @@
 
 pub mod cards;
 pub mod eval;
+pub mod handrank;
 pub mod pack;
 pub mod runout;
 pub mod sampling;
