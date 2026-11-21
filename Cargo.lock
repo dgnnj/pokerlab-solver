@@ -3030,7 +3030,7 @@ dependencies = [
 
 [[package]]
 name = "poker-core"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "flate2",
  "hex",
@@ -3043,7 +3043,7 @@ dependencies = [
 
 [[package]]
 name = "pokerlab"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "log",
  "poker-core",
@@ -3062,7 +3062,7 @@ dependencies = [
 
 [[package]]
 name = "pokerlab-cli"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -3919,7 +3919,7 @@ dependencies = [
 
 [[package]]
 name = "solver-adapter"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "poker-core",
  "postflop-solver",
