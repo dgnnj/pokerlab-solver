@@ -1,6 +1,6 @@
 # Changelog
 
-## Não lançado
+## 0.3.2 — 2026-11-21
 - Rever mãos antigas: botão "Rever" no histórico de mãos abre a mão como foi jogada (mesa, ação, resultado, nota e explicação de cada decisão), sem resolver o board de novo. Mãos interrompidas mostram o estado na última decisão.
 - Banco schema v3 (migração com backup automático): instantâneo de cada mão em `hands.view_json`. Mãos jogadas até a v0.3.1 aparecem na revisão só com os dados gravados de cada decisão.
 
