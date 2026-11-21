@@ -15,6 +15,7 @@ Especificação: `Especificacao_Treinador_Poker_Cash_Game.md` (v1.0). Decisões:
 | Persistência após fechar e reabrir | **Executado** (E2E no app instalado) |
 | Instalador NSIS por usuário | **Executado** nesta máquina (Windows 11 Pro) |
 | Updater 0.1.0 → 0.1.1 com feed local e chave dev, incl. falhas | **Executado** (11/11 checks) |
+| Updater real 0.3.0 → 0.3.1 pelo feed público (chave de produção), com adiar e histórico preservado | **Executado** nesta máquina (8/8 passos; `%LOCALAPPDATA%` virtualizado, não substitui a VM limpa) |
 | CI (`ci.yml`) e release (`release.yml`) no GitHub | **Executado** (releases v0.1.0 a v0.3.1 publicadas) |
 | Teste em VM Windows 11 limpa, SmartScreen, Authenticode | **Pendente** |
 | Publicação com chave de produção e feed `dgnnj/pokerlab-solver` | **Executado** (v0.3.1 é a Latest; `latest.json` assinado e verificado contra a chave pública de produção) |
@@ -99,6 +100,13 @@ Copie o setup 0.1.0 para `out/updater-test/v0.1.0/`, gere a 0.1.1 com `-c` adici
 
 ```bash
 node tests/e2e/updater.mjs
+```
+
+Atualização real pelo feed público, depois de publicar uma release (instala a anterior em `%LOCALAPPDATA%\PokerLab`; dados em `--data`):
+
+```bash
+gh release download v0.3.0 -p 'PokerLab_0.3.0_x64-setup.exe' -D out/updater-live
+node tests/e2e/updater-live.mjs --setup out/updater-live/PokerLab_0.3.0_x64-setup.exe --from 0.3.0 --to 0.3.1
 ```
 
 ## Estrutura
