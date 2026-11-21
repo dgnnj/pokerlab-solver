@@ -1,0 +1,47 @@
+# Prova de conceito do motor: spot pequeno de river, dois jogadores ativos.
+# Ranges construídos manualmente como PREMISSA DE ESTUDO (não derivados de solução pré-flop).
+# Valores em fichas; 100 fichas = 1 bb.
+
+id = "river_poc"
+version = 1
+title = "PoC river — BB x BTN, board Ks7d4c2h9s, pote 10 bb"
+oop_position = "BB"
+ip_position = "BTN"
+pot_type = "SRP"
+initial_street = "river"
+board = "Ks7d4c2h9s"
+chips_per_bb = 100
+starting_pot_chips = 1000
+effective_stack_chips = 4000
+
+[rake]
+rate = 0.0
+cap_chips = 0.0
+structure = "sem rake (fixture de referência)"
+
+[tree]
+add_allin_threshold = 1.5
+force_allin_threshold = 0.15
+merging_threshold = 0.1
+[tree.oop.river]
+bet = "50%, 100%"
+raise = "3x"
+[tree.ip.river]
+bet = "50%, 100%"
+raise = "3x"
+
+[oop_range]
+text = "AK,KQ,KJs,KTs,K9s,99,77,44,22,A7s,98s,87s,76s,65s,QJs,JTs,T9s,A5s,A3s"
+source = "PokerLab — premissa manual para PoC (2026-11-20)"
+manual_premise = true
+notes = "Inclui combos bloqueados pelo board (ex.: AsKs, 22 com 2h) para testar a exclusão."
+
+[ip_range]
+text = "AA,KK,AK,KQ,KJ,99,77,44,QQ,JJ,TT,QJs,JTs,T9s,A5s,86s,65s,A4s:0.5"
+source = "PokerLab — premissa manual para PoC (2026-11-20)"
+manual_premise = true
+
+[solve]
+max_iterations = 1000
+target_exploitability_pct = 0.5
+memory_limit_mib = 4096

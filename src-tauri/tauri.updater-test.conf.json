@@ -1,0 +1,10 @@
+{
+  "identifier": "dev.pokerlab.trainer.updatertest",
+  "productName": "PokerLab UpdaterTest",
+  "plugins": {
+    "updater": {
+      "endpoints": ["http://127.0.0.1:8765/latest.json"],
+      "dangerousInsecureTransportProtocol": true
+    }
+  }
+}

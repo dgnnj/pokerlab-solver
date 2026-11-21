@@ -1,0 +1,30 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Permissões da janela principal: núcleo padrão e somente os comandos do PokerLab.",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "allow-app-info",
+    "allow-list-themes",
+    "allow-list-study-entries",
+    "allow-start-session",
+    "allow-next-exercise",
+    "allow-submit-answer",
+    "allow-end-session",
+    "allow-mark-review",
+    "allow-add-note",
+    "allow-list-notes",
+    "allow-study-node",
+    "allow-progress",
+    "allow-history",
+    "allow-export-csv",
+    "allow-backup-now",
+    "allow-get-pref",
+    "allow-set-pref",
+    "allow-check-update",
+    "allow-install-update"
+  ]
+}

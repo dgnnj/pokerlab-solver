@@ -1,0 +1,12 @@
+# Build output (set CARGO_TARGET_DIR outside OneDrive; see README)
+/target/
+/dist/
+/node_modules/
+/src-tauri/target/
+/src-tauri/gen/
+/out/
+*.tmp
+
+# Signing keys — NEVER commit. Production keys live only in the release environment.
+/.keys/
+*.key

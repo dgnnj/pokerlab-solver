@@ -1,0 +1,965 @@
+{
+  "schema_version": 1,
+  "pack_id": "btn-vs-bb-srp-100bb",
+  "version": "1.0.0",
+  "title": "BTN x BB — pote simples 100 bb (flop)",
+  "description": "Decisões de flop após BTN abrir 2,5 bb e BB pagar. C-bet do BTN, defesa do BB contra c-bet e respostas ao check-raise.",
+  "license": "Dados gerados pelo projeto PokerLab com postflop-solver (AGPL-3.0-or-later). Ranges próprios, premissas de estudo.",
+  "provenance": "Gerado por `pokerlab-cli gen-pack` a partir de data/spots/btn_vs_bb_srp_100bb.toml; ranges manuais revisados em 2026-11-20; sem rake.",
+  "created_at": "2026-11-21T00:08:18Z",
+  "engine": {
+    "name": "postflop-solver",
+    "git_rev": "9d1509fe5077d019825f833eed04b16d342dfda1"
+  },
+  "files": [
+    {
+      "path": "solutions/btn_bb_srp100_ah7c2d-v1.json.gz",
+      "solution_id": "btn_bb_srp100_ah7c2d-v1",
+      "sha256": "a07d1f3a0e24b4c56e799f7075aff4fd31863952c3b9aecec7c8e9339b67d17d",
+      "bytes": 49827
+    },
+    {
+      "path": "solutions/btn_bb_srp100_kd8s3h-v1.json.gz",
+      "solution_id": "btn_bb_srp100_kd8s3h-v1",
+      "sha256": "7f7728fd9624ba139f01a4a50f5e4980963a1e161aa0c5c2127ee5d05b533ade",
+      "bytes": 53354
+    },
+    {
+      "path": "solutions/btn_bb_srp100_qh9c4s-v1.json.gz",
+      "solution_id": "btn_bb_srp100_qh9c4s-v1",
+      "sha256": "63cf7c3884da3020708e06ec30adb3a15561823cec95dabcc726561384270f05",
+      "bytes": 51659
+    },
+    {
+      "path": "solutions/btn_bb_srp100_js9h8c-v1.json.gz",
+      "solution_id": "btn_bb_srp100_js9h8c-v1",
+      "sha256": "d598349fad5c6e409a3104ccdbc4147458a073fd69e0423731a4db9bfc467ae6",
+      "bytes": 48969
+    },
+    {
+      "path": "solutions/btn_bb_srp100_td9d6h-v1.json.gz",
+      "solution_id": "btn_bb_srp100_td9d6h-v1",
+      "sha256": "53ec0c1105d459bb05827bf97d5fbff872d752c82208e6995d8d55949e13ec87",
+      "bytes": 41598
+    },
+    {
+      "path": "solutions/btn_bb_srp100_8s7s5d-v1.json.gz",
+      "solution_id": "btn_bb_srp100_8s7s5d-v1",
+      "sha256": "6a6a049f2d4be328526322a2cd52524831c2772ef5260edc5aabf531f5f5a059",
+      "bytes": 44950
+    },
+    {
+      "path": "solutions/btn_bb_srp100_6c4d2h-v1.json.gz",
+      "solution_id": "btn_bb_srp100_6c4d2h-v1",
+      "sha256": "6c82cba2b1865083e7c7823e90196be2d6376e7bfb81076e18d143fb72b7b0f2",
+      "bytes": 58966
+    },
+    {
+      "path": "solutions/btn_bb_srp100_khks5d-v1.json.gz",
+      "solution_id": "btn_bb_srp100_khks5d-v1",
+      "sha256": "86164240a4fa76e45fd842170882a865d1f23fe891aa4bfb3c2386f3650e9a44",
+      "bytes": 48663
+    },
+    {
+      "path": "solutions/btn_bb_srp100_9h6h3h-v1.json.gz",
+      "solution_id": "btn_bb_srp100_9h6h3h-v1",
+      "sha256": "843b9c882326bdda7dad5b8afbfc275f5947de094cd4e8bf151bc8ed276f9e3a",
+      "bytes": 31055
+    },
+    {
+      "path": "solutions/btn_bb_srp100_adqc5s-v1.json.gz",
+      "solution_id": "btn_bb_srp100_adqc5s-v1",
+      "sha256": "dae311ebdad60eaf987bdc271c076d3f2bfc307ee4747c6c951fdeb981d82421",
+      "bytes": 49354
+    },
+    {
+      "path": "solutions/btn_bb_srp100_qsjd2c-v1.json.gz",
+      "solution_id": "btn_bb_srp100_qsjd2c-v1",
+      "sha256": "1927b9777b7d871d41e844995c0de3efc09a061c1ccd933748495daea13002c9",
+      "bytes": 52175
+    },
+    {
+      "path": "solutions/btn_bb_srp100_7c7d2s-v1.json.gz",
+      "solution_id": "btn_bb_srp100_7c7d2s-v1",
+      "sha256": "185f2a845a88344cf16712d8b744cfe7100cb94cbdc1bd11ca04649d1a1d07a7",
+      "bytes": 49666
+    }
+  ],
+  "exercises": [
+    {
+      "id": "btn_bb_srp100_ah7c2d-v1:x",
+      "solution_id": "btn_bb_srp100_ah7c2d-v1",
+      "node_id": "x",
+      "theme": "srp_flop_ip_bet_or_check",
+      "theme_label": "BTN no flop: apostar ou passar após check",
+      "street": "flop",
+      "position": "BTN",
+      "pot_type": "SRP",
+      "board": "Ah7c2d",
+      "textures": [
+        "rainbow",
+        "A-high"
+      ],
+      "level": 1
+    },
+    {
+      "id": "btn_bb_srp100_ah7c2d-v1:x-b182",
+      "solution_id": "btn_bb_srp100_ah7c2d-v1",
+      "node_id": "x-b182",
+      "theme": "srp_flop_vs_bet",
+      "theme_label": "BB no flop: enfrentar aposta",
+      "street": "flop",
+      "position": "BB",
+      "pot_type": "SRP",
+      "board": "Ah7c2d",
+      "textures": [
+        "rainbow",
+        "A-high"
+      ],
+      "level": 2
+    },
+    {
+      "id": "btn_bb_srp100_ah7c2d-v1:x-b413",
+      "solution_id": "btn_bb_srp100_ah7c2d-v1",
+      "node_id": "x-b413",
+      "theme": "srp_flop_vs_bet",
+      "theme_label": "BB no flop: enfrentar aposta",
+      "street": "flop",
+      "position": "BB",
+      "pot_type": "SRP",
+      "board": "Ah7c2d",
+      "textures": [
+        "rainbow",
+        "A-high"
+      ],
+      "level": 2
+    },
+    {
+      "id": "btn_bb_srp100_ah7c2d-v1:x-b182-r546",
+      "solution_id": "btn_bb_srp100_ah7c2d-v1",
+      "node_id": "x-b182-r546",
+      "theme": "srp_flop_vs_raise",
+      "theme_label": "BTN no flop: enfrentar aumento",
+      "street": "flop",
+      "position": "BTN",
+      "pot_type": "SRP",
+      "board": "Ah7c2d",
+      "textures": [
+        "rainbow",
+        "A-high"
+      ],
+      "level": 3
+    },
+    {
+      "id": "btn_bb_srp100_kd8s3h-v1:x",
+      "solution_id": "btn_bb_srp100_kd8s3h-v1",
+      "node_id": "x",
+      "theme": "srp_flop_ip_bet_or_check",
+      "theme_label": "BTN no flop: apostar ou passar após check",
+      "street": "flop",
+      "position": "BTN",
+      "pot_type": "SRP",
+      "board": "Kd8s3h",
+      "textures": [
+        "rainbow",
+        "broadway-high"
+      ],
+      "level": 1
+    },
+    {
+      "id": "btn_bb_srp100_kd8s3h-v1:x-b182",
+      "solution_id": "btn_bb_srp100_kd8s3h-v1",
+      "node_id": "x-b182",
+      "theme": "srp_flop_vs_bet",
+      "theme_label": "BB no flop: enfrentar aposta",
+      "street": "flop",
+      "position": "BB",
+      "pot_type": "SRP",
+      "board": "Kd8s3h",
+      "textures": [
+        "rainbow",
+        "broadway-high"
+      ],
+      "level": 2
+    },
+    {
+      "id": "btn_bb_srp100_kd8s3h-v1:x-b413",
+      "solution_id": "btn_bb_srp100_kd8s3h-v1",
+      "node_id": "x-b413",
+      "theme": "srp_flop_vs_bet",
+      "theme_label": "BB no flop: enfrentar aposta",
+      "street": "flop",
+      "position": "BB",
+      "pot_type": "SRP",
+      "board": "Kd8s3h",
+      "textures": [
+        "rainbow",
+        "broadway-high"
+      ],
+      "level": 2
+    },
+    {
+      "id": "btn_bb_srp100_kd8s3h-v1:x-b182-r546",
+      "solution_id": "btn_bb_srp100_kd8s3h-v1",
+      "node_id": "x-b182-r546",
+      "theme": "srp_flop_vs_raise",
+      "theme_label": "BTN no flop: enfrentar aumento",
+      "street": "flop",
+      "position": "BTN",
+      "pot_type": "SRP",
+      "board": "Kd8s3h",
+      "textures": [
+        "rainbow",
+        "broadway-high"
+      ],
+      "level": 3
+    },
+    {
+      "id": "btn_bb_srp100_qh9c4s-v1:x",
+      "solution_id": "btn_bb_srp100_qh9c4s-v1",
+      "node_id": "x",
+      "theme": "srp_flop_ip_bet_or_check",
+      "theme_label": "BTN no flop: apostar ou passar após check",
+      "street": "flop",
+      "position": "BTN",
+      "pot_type": "SRP",
+      "board": "Qh9c4s",
+      "textures": [
+        "rainbow",
+        "broadway-high"
+      ],
+      "level": 1
+    },
+    {
+      "id": "btn_bb_srp100_qh9c4s-v1:x-b182",
+      "solution_id": "btn_bb_srp100_qh9c4s-v1",
+      "node_id": "x-b182",
+      "theme": "srp_flop_vs_bet",
+      "theme_label": "BB no flop: enfrentar aposta",
+      "street": "flop",
+      "position": "BB",
+      "pot_type": "SRP",
+      "board": "Qh9c4s",
+      "textures": [
+        "rainbow",
+        "broadway-high"
+      ],
+      "level": 2
+    },
+    {
+      "id": "btn_bb_srp100_qh9c4s-v1:x-b413",
+      "solution_id": "btn_bb_srp100_qh9c4s-v1",
+      "node_id": "x-b413",
+      "theme": "srp_flop_vs_bet",
+      "theme_label": "BB no flop: enfrentar aposta",
+      "street": "flop",
+      "position": "BB",
+      "pot_type": "SRP",
+      "board": "Qh9c4s",
+      "textures": [
+        "rainbow",
+        "broadway-high"
+      ],
+      "level": 2
+    },
+    {
+      "id": "btn_bb_srp100_qh9c4s-v1:x-b182-r546",
+      "solution_id": "btn_bb_srp100_qh9c4s-v1",
+      "node_id": "x-b182-r546",
+      "theme": "srp_flop_vs_raise",
+      "theme_label": "BTN no flop: enfrentar aumento",
+      "street": "flop",
+      "position": "BTN",
+      "pot_type": "SRP",
+      "board": "Qh9c4s",
+      "textures": [
+        "rainbow",
+        "broadway-high"
+      ],
+      "level": 3
+    },
+    {
+      "id": "btn_bb_srp100_js9h8c-v1:x",
+      "solution_id": "btn_bb_srp100_js9h8c-v1",
+      "node_id": "x",
+      "theme": "srp_flop_ip_bet_or_check",
+      "theme_label": "BTN no flop: apostar ou passar após check",
+      "street": "flop",
+      "position": "BTN",
+      "pot_type": "SRP",
+      "board": "Js9h8c",
+      "textures": [
+        "rainbow",
+        "broadway-high",
+        "connected"
+      ],
+      "level": 1
+    },
+    {
+      "id": "btn_bb_srp100_js9h8c-v1:x-b182",
+      "solution_id": "btn_bb_srp100_js9h8c-v1",
+      "node_id": "x-b182",
+      "theme": "srp_flop_vs_bet",
+      "theme_label": "BB no flop: enfrentar aposta",
+      "street": "flop",
+      "position": "BB",
+      "pot_type": "SRP",
+      "board": "Js9h8c",
+      "textures": [
+        "rainbow",
+        "broadway-high",
+        "connected"
+      ],
+      "level": 2
+    },
+    {
+      "id": "btn_bb_srp100_js9h8c-v1:x-b413",
+      "solution_id": "btn_bb_srp100_js9h8c-v1",
+      "node_id": "x-b413",
+      "theme": "srp_flop_vs_bet",
+      "theme_label": "BB no flop: enfrentar aposta",
+      "street": "flop",
+      "position": "BB",
+      "pot_type": "SRP",
+      "board": "Js9h8c",
+      "textures": [
+        "rainbow",
+        "broadway-high",
+        "connected"
+      ],
+      "level": 2
+    },
+    {
+      "id": "btn_bb_srp100_td9d6h-v1:x",
+      "solution_id": "btn_bb_srp100_td9d6h-v1",
+      "node_id": "x",
+      "theme": "srp_flop_ip_bet_or_check",
+      "theme_label": "BTN no flop: apostar ou passar após check",
+      "street": "flop",
+      "position": "BTN",
+      "pot_type": "SRP",
+      "board": "Td9d6h",
+      "textures": [
+        "two-tone",
+        "middle",
+        "connected"
+      ],
+      "level": 1
+    },
+    {
+      "id": "btn_bb_srp100_td9d6h-v1:x-b182",
+      "solution_id": "btn_bb_srp100_td9d6h-v1",
+      "node_id": "x-b182",
+      "theme": "srp_flop_vs_bet",
+      "theme_label": "BB no flop: enfrentar aposta",
+      "street": "flop",
+      "position": "BB",
+      "pot_type": "SRP",
+      "board": "Td9d6h",
+      "textures": [
+        "two-tone",
+        "middle",
+        "connected"
+      ],
+      "level": 2
+    },
+    {
+      "id": "btn_bb_srp100_td9d6h-v1:x-b413",
+      "solution_id": "btn_bb_srp100_td9d6h-v1",
+      "node_id": "x-b413",
+      "theme": "srp_flop_vs_bet",
+      "theme_label": "BB no flop: enfrentar aposta",
+      "street": "flop",
+      "position": "BB",
+      "pot_type": "SRP",
+      "board": "Td9d6h",
+      "textures": [
+        "two-tone",
+        "middle",
+        "connected"
+      ],
+      "level": 2
+    },
+    {
+      "id": "btn_bb_srp100_td9d6h-v1:x-b413-r1239",
+      "solution_id": "btn_bb_srp100_td9d6h-v1",
+      "node_id": "x-b413-r1239",
+      "theme": "srp_flop_vs_raise",
+      "theme_label": "BTN no flop: enfrentar aumento",
+      "street": "flop",
+      "position": "BTN",
+      "pot_type": "SRP",
+      "board": "Td9d6h",
+      "textures": [
+        "two-tone",
+        "middle",
+        "connected"
+      ],
+      "level": 3
+    },
+    {
+      "id": "btn_bb_srp100_8s7s5d-v1:x",
+      "solution_id": "btn_bb_srp100_8s7s5d-v1",
+      "node_id": "x",
+      "theme": "srp_flop_ip_bet_or_check",
+      "theme_label": "BTN no flop: apostar ou passar após check",
+      "street": "flop",
+      "position": "BTN",
+      "pot_type": "SRP",
+      "board": "8s7s5d",
+      "textures": [
+        "two-tone",
+        "middle",
+        "connected"
+      ],
+      "level": 1
+    },
+    {
+      "id": "btn_bb_srp100_8s7s5d-v1:x-b182",
+      "solution_id": "btn_bb_srp100_8s7s5d-v1",
+      "node_id": "x-b182",
+      "theme": "srp_flop_vs_bet",
+      "theme_label": "BB no flop: enfrentar aposta",
+      "street": "flop",
+      "position": "BB",
+      "pot_type": "SRP",
+      "board": "8s7s5d",
+      "textures": [
+        "two-tone",
+        "middle",
+        "connected"
+      ],
+      "level": 2
+    },
+    {
+      "id": "btn_bb_srp100_8s7s5d-v1:x-b413",
+      "solution_id": "btn_bb_srp100_8s7s5d-v1",
+      "node_id": "x-b413",
+      "theme": "srp_flop_vs_bet",
+      "theme_label": "BB no flop: enfrentar aposta",
+      "street": "flop",
+      "position": "BB",
+      "pot_type": "SRP",
+      "board": "8s7s5d",
+      "textures": [
+        "two-tone",
+        "middle",
+        "connected"
+      ],
+      "level": 2
+    },
+    {
+      "id": "btn_bb_srp100_8s7s5d-v1:x-b182-r546",
+      "solution_id": "btn_bb_srp100_8s7s5d-v1",
+      "node_id": "x-b182-r546",
+      "theme": "srp_flop_vs_raise",
+      "theme_label": "BTN no flop: enfrentar aumento",
+      "street": "flop",
+      "position": "BTN",
+      "pot_type": "SRP",
+      "board": "8s7s5d",
+      "textures": [
+        "two-tone",
+        "middle",
+        "connected"
+      ],
+      "level": 3
+    },
+    {
+      "id": "btn_bb_srp100_8s7s5d-v1:x-b413-r1239",
+      "solution_id": "btn_bb_srp100_8s7s5d-v1",
+      "node_id": "x-b413-r1239",
+      "theme": "srp_flop_vs_raise",
+      "theme_label": "BTN no flop: enfrentar aumento",
+      "street": "flop",
+      "position": "BTN",
+      "pot_type": "SRP",
+      "board": "8s7s5d",
+      "textures": [
+        "two-tone",
+        "middle",
+        "connected"
+      ],
+      "level": 3
+    },
+    {
+      "id": "btn_bb_srp100_6c4d2h-v1:x",
+      "solution_id": "btn_bb_srp100_6c4d2h-v1",
+      "node_id": "x",
+      "theme": "srp_flop_ip_bet_or_check",
+      "theme_label": "BTN no flop: apostar ou passar após check",
+      "street": "flop",
+      "position": "BTN",
+      "pot_type": "SRP",
+      "board": "6c4d2h",
+      "textures": [
+        "rainbow",
+        "low",
+        "connected"
+      ],
+      "level": 1
+    },
+    {
+      "id": "btn_bb_srp100_6c4d2h-v1:x-b182",
+      "solution_id": "btn_bb_srp100_6c4d2h-v1",
+      "node_id": "x-b182",
+      "theme": "srp_flop_vs_bet",
+      "theme_label": "BB no flop: enfrentar aposta",
+      "street": "flop",
+      "position": "BB",
+      "pot_type": "SRP",
+      "board": "6c4d2h",
+      "textures": [
+        "rainbow",
+        "low",
+        "connected"
+      ],
+      "level": 2
+    },
+    {
+      "id": "btn_bb_srp100_6c4d2h-v1:x-b413",
+      "solution_id": "btn_bb_srp100_6c4d2h-v1",
+      "node_id": "x-b413",
+      "theme": "srp_flop_vs_bet",
+      "theme_label": "BB no flop: enfrentar aposta",
+      "street": "flop",
+      "position": "BB",
+      "pot_type": "SRP",
+      "board": "6c4d2h",
+      "textures": [
+        "rainbow",
+        "low",
+        "connected"
+      ],
+      "level": 2
+    },
+    {
+      "id": "btn_bb_srp100_6c4d2h-v1:x-b182-r546",
+      "solution_id": "btn_bb_srp100_6c4d2h-v1",
+      "node_id": "x-b182-r546",
+      "theme": "srp_flop_vs_raise",
+      "theme_label": "BTN no flop: enfrentar aumento",
+      "street": "flop",
+      "position": "BTN",
+      "pot_type": "SRP",
+      "board": "6c4d2h",
+      "textures": [
+        "rainbow",
+        "low",
+        "connected"
+      ],
+      "level": 3
+    },
+    {
+      "id": "btn_bb_srp100_6c4d2h-v1:x-b413-r1239",
+      "solution_id": "btn_bb_srp100_6c4d2h-v1",
+      "node_id": "x-b413-r1239",
+      "theme": "srp_flop_vs_raise",
+      "theme_label": "BTN no flop: enfrentar aumento",
+      "street": "flop",
+      "position": "BTN",
+      "pot_type": "SRP",
+      "board": "6c4d2h",
+      "textures": [
+        "rainbow",
+        "low",
+        "connected"
+      ],
+      "level": 3
+    },
+    {
+      "id": "btn_bb_srp100_khks5d-v1:x",
+      "solution_id": "btn_bb_srp100_khks5d-v1",
+      "node_id": "x",
+      "theme": "srp_flop_ip_bet_or_check",
+      "theme_label": "BTN no flop: apostar ou passar após check",
+      "street": "flop",
+      "position": "BTN",
+      "pot_type": "SRP",
+      "board": "KhKs5d",
+      "textures": [
+        "rainbow",
+        "paired",
+        "broadway-high"
+      ],
+      "level": 1
+    },
+    {
+      "id": "btn_bb_srp100_khks5d-v1:x-b182",
+      "solution_id": "btn_bb_srp100_khks5d-v1",
+      "node_id": "x-b182",
+      "theme": "srp_flop_vs_bet",
+      "theme_label": "BB no flop: enfrentar aposta",
+      "street": "flop",
+      "position": "BB",
+      "pot_type": "SRP",
+      "board": "KhKs5d",
+      "textures": [
+        "rainbow",
+        "paired",
+        "broadway-high"
+      ],
+      "level": 2
+    },
+    {
+      "id": "btn_bb_srp100_khks5d-v1:x-b182-r546",
+      "solution_id": "btn_bb_srp100_khks5d-v1",
+      "node_id": "x-b182-r546",
+      "theme": "srp_flop_vs_raise",
+      "theme_label": "BTN no flop: enfrentar aumento",
+      "street": "flop",
+      "position": "BTN",
+      "pot_type": "SRP",
+      "board": "KhKs5d",
+      "textures": [
+        "rainbow",
+        "paired",
+        "broadway-high"
+      ],
+      "level": 3
+    },
+    {
+      "id": "btn_bb_srp100_9h6h3h-v1:x",
+      "solution_id": "btn_bb_srp100_9h6h3h-v1",
+      "node_id": "x",
+      "theme": "srp_flop_ip_bet_or_check",
+      "theme_label": "BTN no flop: apostar ou passar após check",
+      "street": "flop",
+      "position": "BTN",
+      "pot_type": "SRP",
+      "board": "9h6h3h",
+      "textures": [
+        "monotone",
+        "middle"
+      ],
+      "level": 1
+    },
+    {
+      "id": "btn_bb_srp100_9h6h3h-v1:x-b182",
+      "solution_id": "btn_bb_srp100_9h6h3h-v1",
+      "node_id": "x-b182",
+      "theme": "srp_flop_vs_bet",
+      "theme_label": "BB no flop: enfrentar aposta",
+      "street": "flop",
+      "position": "BB",
+      "pot_type": "SRP",
+      "board": "9h6h3h",
+      "textures": [
+        "monotone",
+        "middle"
+      ],
+      "level": 2
+    },
+    {
+      "id": "btn_bb_srp100_9h6h3h-v1:x-b413",
+      "solution_id": "btn_bb_srp100_9h6h3h-v1",
+      "node_id": "x-b413",
+      "theme": "srp_flop_vs_bet",
+      "theme_label": "BB no flop: enfrentar aposta",
+      "street": "flop",
+      "position": "BB",
+      "pot_type": "SRP",
+      "board": "9h6h3h",
+      "textures": [
+        "monotone",
+        "middle"
+      ],
+      "level": 2
+    },
+    {
+      "id": "btn_bb_srp100_9h6h3h-v1:x-b182-r546",
+      "solution_id": "btn_bb_srp100_9h6h3h-v1",
+      "node_id": "x-b182-r546",
+      "theme": "srp_flop_vs_raise",
+      "theme_label": "BTN no flop: enfrentar aumento",
+      "street": "flop",
+      "position": "BTN",
+      "pot_type": "SRP",
+      "board": "9h6h3h",
+      "textures": [
+        "monotone",
+        "middle"
+      ],
+      "level": 3
+    },
+    {
+      "id": "btn_bb_srp100_adqc5s-v1:x",
+      "solution_id": "btn_bb_srp100_adqc5s-v1",
+      "node_id": "x",
+      "theme": "srp_flop_ip_bet_or_check",
+      "theme_label": "BTN no flop: apostar ou passar após check",
+      "street": "flop",
+      "position": "BTN",
+      "pot_type": "SRP",
+      "board": "AdQc5s",
+      "textures": [
+        "rainbow",
+        "A-high"
+      ],
+      "level": 1
+    },
+    {
+      "id": "btn_bb_srp100_adqc5s-v1:x-b413",
+      "solution_id": "btn_bb_srp100_adqc5s-v1",
+      "node_id": "x-b413",
+      "theme": "srp_flop_vs_bet",
+      "theme_label": "BB no flop: enfrentar aposta",
+      "street": "flop",
+      "position": "BB",
+      "pot_type": "SRP",
+      "board": "AdQc5s",
+      "textures": [
+        "rainbow",
+        "A-high"
+      ],
+      "level": 2
+    },
+    {
+      "id": "btn_bb_srp100_qsjd2c-v1:x",
+      "solution_id": "btn_bb_srp100_qsjd2c-v1",
+      "node_id": "x",
+      "theme": "srp_flop_ip_bet_or_check",
+      "theme_label": "BTN no flop: apostar ou passar após check",
+      "street": "flop",
+      "position": "BTN",
+      "pot_type": "SRP",
+      "board": "QsJd2c",
+      "textures": [
+        "rainbow",
+        "broadway-high"
+      ],
+      "level": 1
+    },
+    {
+      "id": "btn_bb_srp100_qsjd2c-v1:x-b182",
+      "solution_id": "btn_bb_srp100_qsjd2c-v1",
+      "node_id": "x-b182",
+      "theme": "srp_flop_vs_bet",
+      "theme_label": "BB no flop: enfrentar aposta",
+      "street": "flop",
+      "position": "BB",
+      "pot_type": "SRP",
+      "board": "QsJd2c",
+      "textures": [
+        "rainbow",
+        "broadway-high"
+      ],
+      "level": 2
+    },
+    {
+      "id": "btn_bb_srp100_qsjd2c-v1:x-b413",
+      "solution_id": "btn_bb_srp100_qsjd2c-v1",
+      "node_id": "x-b413",
+      "theme": "srp_flop_vs_bet",
+      "theme_label": "BB no flop: enfrentar aposta",
+      "street": "flop",
+      "position": "BB",
+      "pot_type": "SRP",
+      "board": "QsJd2c",
+      "textures": [
+        "rainbow",
+        "broadway-high"
+      ],
+      "level": 2
+    },
+    {
+      "id": "btn_bb_srp100_qsjd2c-v1:x-b182-r546",
+      "solution_id": "btn_bb_srp100_qsjd2c-v1",
+      "node_id": "x-b182-r546",
+      "theme": "srp_flop_vs_raise",
+      "theme_label": "BTN no flop: enfrentar aumento",
+      "street": "flop",
+      "position": "BTN",
+      "pot_type": "SRP",
+      "board": "QsJd2c",
+      "textures": [
+        "rainbow",
+        "broadway-high"
+      ],
+      "level": 3
+    },
+    {
+      "id": "btn_bb_srp100_7c7d2s-v1:x",
+      "solution_id": "btn_bb_srp100_7c7d2s-v1",
+      "node_id": "x",
+      "theme": "srp_flop_ip_bet_or_check",
+      "theme_label": "BTN no flop: apostar ou passar após check",
+      "street": "flop",
+      "position": "BTN",
+      "pot_type": "SRP",
+      "board": "7c7d2s",
+      "textures": [
+        "rainbow",
+        "paired",
+        "low"
+      ],
+      "level": 1
+    },
+    {
+      "id": "btn_bb_srp100_7c7d2s-v1:x-b182",
+      "solution_id": "btn_bb_srp100_7c7d2s-v1",
+      "node_id": "x-b182",
+      "theme": "srp_flop_vs_bet",
+      "theme_label": "BB no flop: enfrentar aposta",
+      "street": "flop",
+      "position": "BB",
+      "pot_type": "SRP",
+      "board": "7c7d2s",
+      "textures": [
+        "rainbow",
+        "paired",
+        "low"
+      ],
+      "level": 2
+    },
+    {
+      "id": "btn_bb_srp100_7c7d2s-v1:x-b413",
+      "solution_id": "btn_bb_srp100_7c7d2s-v1",
+      "node_id": "x-b413",
+      "theme": "srp_flop_vs_bet",
+      "theme_label": "BB no flop: enfrentar aposta",
+      "street": "flop",
+      "position": "BB",
+      "pot_type": "SRP",
+      "board": "7c7d2s",
+      "textures": [
+        "rainbow",
+        "paired",
+        "low"
+      ],
+      "level": 2
+    },
+    {
+      "id": "btn_bb_srp100_7c7d2s-v1:x-b182-r546",
+      "solution_id": "btn_bb_srp100_7c7d2s-v1",
+      "node_id": "x-b182-r546",
+      "theme": "srp_flop_vs_raise",
+      "theme_label": "BTN no flop: enfrentar aumento",
+      "street": "flop",
+      "position": "BTN",
+      "pot_type": "SRP",
+      "board": "7c7d2s",
+      "textures": [
+        "rainbow",
+        "paired",
+        "low"
+      ],
+      "level": 3
+    },
+    {
+      "id": "btn_bb_srp100_7c7d2s-v1:x-b413-r1239",
+      "solution_id": "btn_bb_srp100_7c7d2s-v1",
+      "node_id": "x-b413-r1239",
+      "theme": "srp_flop_vs_raise",
+      "theme_label": "BTN no flop: enfrentar aumento",
+      "street": "flop",
+      "position": "BTN",
+      "pot_type": "SRP",
+      "board": "7c7d2s",
+      "textures": [
+        "rainbow",
+        "paired",
+        "low"
+      ],
+      "level": 3
+    }
+  ],
+  "solves": [
+    {
+      "solution_id": "btn_bb_srp100_ah7c2d-v1",
+      "board": "Ah7c2d",
+      "final_exploitability_pct_pot": 0.43374772505326703,
+      "solve_ms": 89452,
+      "memory_estimate_bytes": 4126803404,
+      "status": "Converged"
+    },
+    {
+      "solution_id": "btn_bb_srp100_kd8s3h-v1",
+      "board": "Kd8s3h",
+      "final_exploitability_pct_pot": 0.4474064220081676,
+      "solve_ms": 93790,
+      "memory_estimate_bytes": 4237901876,
+      "status": "Converged"
+    },
+    {
+      "solution_id": "btn_bb_srp100_qh9c4s-v1",
+      "board": "Qh9c4s",
+      "final_exploitability_pct_pot": 0.45653291182084516,
+      "solve_ms": 82241,
+      "memory_estimate_bytes": 4126803404,
+      "status": "Converged"
+    },
+    {
+      "solution_id": "btn_bb_srp100_js9h8c-v1",
+      "board": "Js9h8c",
+      "final_exploitability_pct_pot": 0.470137509432706,
+      "solve_ms": 60614,
+      "memory_estimate_bytes": 4082183384,
+      "status": "Converged"
+    },
+    {
+      "solution_id": "btn_bb_srp100_td9d6h-v1",
+      "board": "Td9d6h",
+      "final_exploitability_pct_pot": 0.4256099354137074,
+      "solve_ms": 74590,
+      "memory_estimate_bytes": 2491603172,
+      "status": "Converged"
+    },
+    {
+      "solution_id": "btn_bb_srp100_8s7s5d-v1",
+      "board": "8s7s5d",
+      "final_exploitability_pct_pot": 0.4507352655584162,
+      "solve_ms": 67077,
+      "memory_estimate_bytes": 2616991008,
+      "status": "Converged"
+    },
+    {
+      "solution_id": "btn_bb_srp100_6c4d2h-v1",
+      "board": "6c4d2h",
+      "final_exploitability_pct_pot": 0.4823244268243963,
+      "solve_ms": 90291,
+      "memory_estimate_bytes": 4408060056,
+      "status": "Converged"
+    },
+    {
+      "solution_id": "btn_bb_srp100_khks5d-v1",
+      "board": "KhKs5d",
+      "final_exploitability_pct_pot": 0.4872797185724432,
+      "solve_ms": 109827,
+      "memory_estimate_bytes": 2577712752,
+      "status": "Converged"
+    },
+    {
+      "solution_id": "btn_bb_srp100_9h6h3h-v1",
+      "board": "9h6h3h",
+      "final_exploitability_pct_pot": 0.44771888039328833,
+      "solve_ms": 27298,
+      "memory_estimate_bytes": 1230724480,
+      "status": "Converged"
+    },
+    {
+      "solution_id": "btn_bb_srp100_adqc5s-v1",
+      "board": "AdQc5s",
+      "final_exploitability_pct_pot": 0.4257333928888494,
+      "solve_ms": 71310,
+      "memory_estimate_bytes": 3965569228,
+      "status": "Converged"
+    },
+    {
+      "solution_id": "btn_bb_srp100_qsjd2c-v1",
+      "board": "QsJd2c",
+      "final_exploitability_pct_pot": 0.4532189802689986,
+      "solve_ms": 68775,
+      "memory_estimate_bytes": 4175132796,
+      "status": "Converged"
+    },
+    {
+      "solution_id": "btn_bb_srp100_7c7d2s-v1",
+      "board": "7c7d2s",
+      "final_exploitability_pct_pot": 0.4822047840465199,
+      "solve_ms": 68186,
+      "memory_estimate_bytes": 2750351436,
+      "status": "Converged"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+[package]
+name = "solver-adapter"
+description = "Isolates the postflop-solver API: SpotConfig -> game, solve with progress/cancel, export nodes."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+poker-core = { path = "../poker-core" }
+postflop-solver.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true

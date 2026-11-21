@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-submit-answer"
+description = "Enables the submit_answer command without any pre-configured scope."
+commands.allow = ["submit_answer"]
+
+[[permission]]
+identifier = "deny-submit-answer"
+description = "Denies the submit_answer command without any pre-configured scope."
+commands.deny = ["submit_answer"]
