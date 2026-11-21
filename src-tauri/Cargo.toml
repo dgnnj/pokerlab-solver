@@ -1,7 +1,7 @@
 [package]
 name = "pokerlab"
 description = "PokerLab — treinador de poker cash game (NLHE) offline"
-version = "0.3.1"
+version = "0.3.2"
 edition.workspace = true
 license.workspace = true
 default-run = "pokerlab"
