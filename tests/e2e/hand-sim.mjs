@@ -8,7 +8,7 @@
 //        --data out/e2e-hand-data --shots out/e2e-hand-shots --board 9h6h3h --hands 3 --hero BB
 import { chromium } from "playwright-core";
 import { spawn, execFileSync } from "node:child_process";
-import { mkdirSync, openSync, rmSync } from "node:fs";
+import { mkdirSync, openSync, readFileSync, rmSync } from "node:fs";
 import path from "node:path";
 
 const arg = (name, def) => {
@@ -144,6 +144,16 @@ await page.getByRole("heading", { name: "Histórico de mãos" }).waitFor();
 const rows1 = await page.locator("table tbody tr").count();
 await page.screenshot({ path: path.join(shots, "05-historico.png"), fullPage: true });
 if (rows1 !== hands) fail(`histórico com ${rows1} linhas (esperado ${hands})`);
+// CSV export of the hands: one line per decision plus the header.
+await page.getByRole("button", { name: "Exportar mãos completas (CSV)" }).click();
+const exportMsg = await page.getByText(/mãos \(\d+ linhas, uma por decisão\) exportadas para /).innerText();
+log(`export: ${exportMsg}`);
+const csvPath = exportMsg.split(" exportadas para ")[1].trim();
+const csvLines = readFileSync(csvPath, "utf8").trim().split("\n");
+const totalSteps = played.reduce((a, p) => a + p.steps, 0);
+if (!exportMsg.startsWith(`${hands} mãos`)) fail(`export: ${exportMsg}`);
+if (csvLines.length !== totalSteps + 1) fail(`CSV com ${csvLines.length - 1} linhas (esperado ${totalSteps})`);
+if (!csvLines[0].startsWith("hand_id,")) fail(`cabeçalho do CSV: ${csvLines[0]}`);
 await browser.close();
 await shutdown(child);
 log("app fechado");

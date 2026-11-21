@@ -246,6 +246,48 @@ impl Db {
         Ok(dest.to_path_buf())
     }
 
+    /// Runs `SELECT <exprs> <rest>` and renders the rows as CSV (comma separator, `.` decimals,
+    /// RFC 4180 quoting). `columns` pairs each SQL expression with its CSV header, so the two
+    /// cannot drift apart. Returns the text and the number of data rows.
+    pub fn query_csv(
+        &self,
+        columns: &[(&str, &str)],
+        rest: &str,
+    ) -> Result<(String, usize), DbError> {
+        let exprs: Vec<&str> = columns.iter().map(|&(e, _)| e).collect();
+        let mut st = self
+            .conn
+            .prepare(&format!("SELECT {} {rest}", exprs.join(", ")))?;
+        let mut out = columns
+            .iter()
+            .map(|&(_, h)| h)
+            .collect::<Vec<_>>()
+            .join(",");
+        out.push('\n');
+        let mut rows = st.query([])?;
+        let mut n = 0;
+        while let Some(r) = rows.next()? {
+            let mut fields = Vec::with_capacity(columns.len());
+            for i in 0..columns.len() {
+                let s = match r.get::<_, rusqlite::types::Value>(i)? {
+                    rusqlite::types::Value::Null | rusqlite::types::Value::Blob(_) => String::new(),
+                    rusqlite::types::Value::Integer(x) => x.to_string(),
+                    rusqlite::types::Value::Real(x) => format!("{x}"),
+                    rusqlite::types::Value::Text(t) => t,
+                };
+                fields.push(if s.contains([',', '"', '\n', '\r']) {
+                    format!("\"{}\"", s.replace('"', "\"\""))
+                } else {
+                    s
+                });
+            }
+            out.push_str(&fields.join(","));
+            out.push('\n');
+            n += 1;
+        }
+        Ok((out, n))
+    }
+
     pub fn get_pref(&self, key: &str) -> Result<Option<String>, DbError> {
         Ok(self
             .conn

@@ -408,6 +408,7 @@ export const api = {
     invoke<HandView>("hand_act", { token, action, decisionMs }),
   handView: (token: string) => invoke<HandView>("hand_view", { token }),
   handHistory: (limit?: number) => invoke<HandHistory>("hand_history", { limit }),
+  exportHandsCsv: () => invoke<string>("export_hands_csv"),
   checkUpdate: () => invoke<UpdateCheck>("check_update"),
   installUpdate: (onEvent: (e: DownloadEvent) => void) => {
     const ch = new Channel<DownloadEvent>();

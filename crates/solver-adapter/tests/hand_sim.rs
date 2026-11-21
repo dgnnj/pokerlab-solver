@@ -364,11 +364,9 @@ fn zero_weight_line_stops_grading() {
             .act(game, s, next.actions.len() - 1, Tolerance::default())
             .unwrap();
         assert!(d2.feedback.is_none());
-        assert!(d2
-            .not_evaluable
-            .as_deref()
-            .unwrap()
-            .contains("última decisão avaliável"));
+        let why = d2.not_evaluable.as_deref().unwrap();
+        assert!(why.contains("última decisão avaliável"));
+        assert!(why.contains("abaixo de 0,001%"), "{why}");
         assert!(sim.cut.is_some());
         return;
     }

@@ -1,5 +1,9 @@
 # Changelog
 
+## Não lançado
+- Exportar mãos completas (CSV): uma linha por decisão, com os dados da mão (cartas, board, linha, resultado) e a avaliação de cada decisão. Botão no histórico de mãos e em Configurações.
+- Correção: o motivo de corte da nota na mão completa mostrava "frequência acumulada 0.000000%"; agora diz "abaixo de 0,001%" (o limite real).
+
 ## 0.3.0 — 2026-11-21
 - Mão completa: jogar do flop ao river contra a estratégia do motor. O app resolve a árvore completa do flop escolhido em segundo plano (progresso, cancelamento, mesma configuração do pacote) e mantém um board na memória; mãos sorteadas juntas pelos ranges, adversário pela estratégia da mão dele, turn/river sem reposição, runout distribuído após all-in, showdown com ranking próprio de mãos.
 - Nota por decisão (perda de EV), opção de ver as notas só no fim da mão, revisão das decisões, corte explicado quando a linha tem peso nulo na solução. Resultado da mão separado da perda de EV.
