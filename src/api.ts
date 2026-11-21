@@ -345,6 +345,33 @@ export interface HandRow {
   total_loss_bb: number;
   cut_reason: string | null;
   pack_version: string;
+  solution_id: string;
+  villain_position: string;
+}
+
+/** Decision as stored in the database (bb amounts null when the spot is no longer installed). */
+export interface StoredDecision {
+  seq: number;
+  street: string;
+  board: string;
+  pot_bb: number | null;
+  chosen_label: string;
+  best_label: string | null;
+  best_ev_bb: number | null;
+  chosen_ev_bb: number | null;
+  loss_bb: number | null;
+  loss_pct_pot: number | null;
+  grade: string | null;
+  chosen_frequency: number | null;
+  equity: number | null;
+  not_evaluable: string | null;
+}
+
+/** Past hand: snapshot of the view as played (null for hands from before v0.3.2). */
+export interface HandReview {
+  row: HandRow;
+  view: HandView | null;
+  decisions: StoredDecision[];
 }
 
 export interface HandStats {
@@ -409,6 +436,7 @@ export const api = {
   handView: (token: string) => invoke<HandView>("hand_view", { token }),
   handHistory: (limit?: number) => invoke<HandHistory>("hand_history", { limit }),
   exportHandsCsv: () => invoke<string>("export_hands_csv"),
+  handReview: (id: number) => invoke<HandReview>("hand_review", { id }),
   checkUpdate: () => invoke<UpdateCheck>("check_update"),
   installUpdate: (onEvent: (e: DownloadEvent) => void) => {
     const ch = new Channel<DownloadEvent>();

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, BoardOption, EngineStatus, errorText, HandDecision, HandHistory, HandView } from "../api";
+import { api, BoardOption, EngineStatus, errorText, HandDecision, HandHistory, HandReview, HandView } from "../api";
 import type { Nav } from "../App";
 import { CardRow } from "../components/Cards";
 import { actionClass, bb, freq, GRADE_LABEL, pct, shortDate, signedBb } from "../format";
@@ -188,6 +188,209 @@ function EventLog({ v }: { v: HandView }) {
   );
 }
 
+function Felt({ hand, villainCards }: { hand: HandView; villainCards?: string[] | null }) {
+  const shown = villainCards ?? hand.villain_cards;
+  return (
+    <div className="table-felt" aria-label="Mesa">
+      <div className="villain hero">
+        <span className="seat">{hand.villain_position}</span>
+        {shown ? <CardRow cards={shown} size="lg" /> : <CardBacks />}
+        <span className="stack">Stack: {bb(hand.villain_stack_bb)}</span>
+      </div>
+      <div className="board" aria-label={`Board no ${hand.street}`}>
+        <CardRow cards={hand.board} size="lg" />
+        <div className="pot">
+          Pote: <b>{bb(hand.pot_bb)}</b>
+          {hand.to_call_bb > 0 && !hand.finished && (
+            <>
+              {" "}
+              · a pagar <b>{bb(hand.to_call_bb)}</b> (equidade necessária{" "}
+              {pct((100 * hand.to_call_bb) / (hand.pot_bb + hand.to_call_bb))})
+            </>
+          )}
+        </div>
+      </div>
+      <div className="hero">
+        <span className="seat hero-seat">Você: {hand.hero_position}</span>
+        <CardRow cards={hand.hero_cards} size="lg" />
+        <span className="stack">Stack: {bb(hand.hero_stack_bb)}</span>
+      </div>
+    </div>
+  );
+}
+
+function OutcomePanel({ hand }: { hand: HandView }) {
+  const o = hand.outcome;
+  if (!o) return null;
+  return (
+    <>
+      <div className={`card-panel highlight result-${o.winner}`} role="status">
+        <h2>{o.summary}</h2>
+        <div className="stats-row">
+          <div className="stat">
+            <span className="stat-v">{signedBb(o.hero_net_bb)}</span>
+            <span className="stat-l">Resultado no pós-flop (pote de {bb(o.pot_bb)})</span>
+          </div>
+          {o.hero_total_bb != null && (
+            <div className="stat">
+              <span className="stat-v">{signedBb(o.hero_total_bb)}</span>
+              <span className="stat-l">Na mão, contando o pré-flop</span>
+            </div>
+          )}
+          <div className="stat">
+            <span className="stat-v">{bb(hand.summary.total_loss_bb, 3)}</span>
+            <span className="stat-l">
+              Perda de EV nas suas decisões ({hand.summary.graded} de {hand.summary.decisions} avaliadas)
+            </span>
+          </div>
+        </div>
+        {o.showdown && (
+          <p>
+            Você: {o.hero_hand} · Adversário ({hand.villain_cards?.join("")}): {o.villain_hand}
+          </p>
+        )}
+        {o.rake_bb > 0 && <p className="small">Rake: {bb(o.rake_bb)}</p>}
+        <p className="muted small">
+          O resultado é a sorte da mão; a perda de EV mede a qualidade das decisões contra a estratégia do motor. Uma mão
+          ganha com erros continua com erros.
+        </p>
+      </div>
+      {hand.cut && <div className="alert">{hand.cut}</div>}
+    </>
+  );
+}
+
+function DecisionList({ hand }: { hand: HandView }) {
+  return (
+    <>
+      <h2>Suas decisões</h2>
+      {hand.decisions.length === 0 && <p className="muted">Nenhuma decisão sua nesta mão.</p>}
+      {hand.decisions.map((d) => (
+        <details key={d.seq} className="decision-review" open={d.feedback?.grade === "mistake" || d.feedback?.grade === "inaccuracy"}>
+          <summary>
+            <b>{d.street}</b> {d.board.join(" ")} · pote {bb(d.pot_bb)} · você: {d.chosen_label} ·{" "}
+            <span className={d.feedback ? `grade-${d.feedback.grade}` : ""}>
+              {d.feedback ? GRADE_LABEL[d.feedback.grade] : "sem avaliação"}
+              {d.feedback && d.feedback.loss_bb > 0 ? ` (−${bb(d.feedback.loss_bb, 3)})` : ""}
+            </span>
+          </summary>
+          <DecisionDetail d={d} />
+        </details>
+      ))}
+    </>
+  );
+}
+
+const splitCombo = (c: string) => [c.slice(0, 2), c.slice(2, 4)];
+
+/** A past hand from the history, read from the database (no engine needed). */
+function PastHand({ review, onBack }: { review: HandReview; onBack: () => void }) {
+  const { row, view } = review;
+  const villain = splitCombo(row.villain_combo);
+  return (
+    <section className="train">
+      <header className="train-head">
+        <div>
+          <h1>Revisão da mão</h1>
+          <span className="muted">
+            {shortDate(row.started_at)} · você {row.hero_position} contra {row.villain_position} · board inicial {row.flop} ·
+            pacote v{row.pack_version}
+          </span>
+        </div>
+        <div className="row">
+          <button onClick={onBack} autoFocus>
+            Voltar
+          </button>
+        </div>
+      </header>
+      {!row.ended_at && (
+        <div className="alert">
+          Mão interrompida antes do fim{view ? " (estado na última decisão)" : ""}. As cartas do adversário aparecem só nesta
+          revisão.
+        </div>
+      )}
+      {view ? (
+        <>
+          <Felt hand={view} villainCards={view.villain_cards ?? villain} />
+          <EventLog v={view} />
+          <OutcomePanel hand={view} />
+          {!view.outcome && view.cut && <div className="alert">{view.cut}</div>}
+          <DecisionList hand={view} />
+        </>
+      ) : (
+        <LegacyHand review={review} villain={villain} />
+      )}
+    </section>
+  );
+}
+
+/** Hands played before snapshots existed (up to v0.3.1): show what the database kept. */
+function LegacyHand({ review, villain }: { review: HandReview; villain: string[] }) {
+  const { row, decisions } = review;
+  return (
+    <>
+      <p className="muted small">
+        Esta mão foi jogada numa versão anterior à revisão completa: aparecem os dados gravados de cada decisão, sem a tabela
+        de ações e sem a explicação.
+      </p>
+      <div className="card-panel">
+        <p>
+          Você ({row.hero_position}): <CardRow cards={splitCombo(row.hero_combo)} /> · Adversário ({row.villain_position}):{" "}
+          <CardRow cards={villain} />
+        </p>
+        <p>
+          Board: <CardRow cards={splitBoard(row.final_board ?? row.flop)} />
+        </p>
+        {row.line && <p className="small">{row.line}</p>}
+        {row.ended_at && (
+          <p>
+            Resultado no pós-flop: <b>{signedBb(row.hero_net_bb ?? 0)}</b> · perda de EV {bb(row.total_loss_bb, 3)} ({row.graded}{" "}
+            de {row.decisions} avaliadas)
+          </p>
+        )}
+        {row.cut_reason && <div className="alert">{row.cut_reason}</div>}
+      </div>
+      <h2>Suas decisões</h2>
+      {decisions.length === 0 ? (
+        <p className="muted">Nenhuma decisão gravada.</p>
+      ) : (
+        <table className="decision-table">
+          <thead>
+            <tr>
+              <th>Rua</th>
+              <th>Board</th>
+              <th>Pote</th>
+              <th>Sua ação</th>
+              <th>Melhor</th>
+              <th>Nota</th>
+              <th>Perda</th>
+              <th>Frequência</th>
+              <th>Equidade</th>
+            </tr>
+          </thead>
+          <tbody>
+            {decisions.map((d) => (
+              <tr key={d.seq}>
+                <td>{d.street}</td>
+                <td>{d.board}</td>
+                <td>{d.pot_bb != null ? bb(d.pot_bb) : "—"}</td>
+                <td>{d.chosen_label}</td>
+                <td>{d.best_label ?? "—"}</td>
+                <td className={d.grade ? `grade-${d.grade}` : ""}>
+                  {d.grade ? (GRADE_LABEL[d.grade] ?? d.grade) : "sem avaliação"}
+                </td>
+                <td>{d.loss_bb != null ? `${bb(d.loss_bb, 3)} (${pct(d.loss_pct_pot ?? 0, 2)})` : "—"}</td>
+                <td>{d.chosen_frequency != null ? freq(d.chosen_frequency) : "—"}</td>
+                <td>{d.equity != null ? pct(100 * d.equity) : "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </>
+  );
+}
+
 export function Hand({ nav }: { nav: Nav }) {
   const [boards, setBoards] = useState<BoardOption[]>([]);
   const [status, setStatus] = useState<EngineStatus | null>(null);
@@ -199,6 +402,7 @@ export function Hand({ nav }: { nav: Nav }) {
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [exported, setExported] = useState<string | null>(null);
+  const [review, setReview] = useState<HandReview | null>(null);
   const shownAt = useRef(performance.now());
 
   memo.solutionId = solutionId;
@@ -315,8 +519,23 @@ export function Hand({ nav }: { nav: Nav }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [hand, act, newHand]);
 
+  const openReview = useCallback(async (id: number) => {
+    setErr(null);
+    try {
+      setReview(await api.handReview(id));
+      window.scrollTo(0, 0);
+    } catch (e) {
+      setErr(errorText(e));
+    }
+  }, []);
+
   const ready = status?.state === "ready";
   const readyBoard = ready ? status.board : null;
+
+  // ---------- Past hand ----------
+  if (review && !hand) {
+    return <PastHand review={review} onBack={() => setReview(null)} />;
+  }
 
   // ---------- Active hand ----------
   if (hand) {
@@ -344,31 +563,7 @@ export function Hand({ nav }: { nav: Nav }) {
         </header>
         {err && <div className="alert alert-error">{err}</div>}
 
-        <div className="table-felt" aria-label="Mesa">
-          <div className="villain hero">
-            <span className="seat">{hand.villain_position}</span>
-            {hand.villain_cards ? <CardRow cards={hand.villain_cards} size="lg" /> : <CardBacks />}
-            <span className="stack">Stack: {bb(hand.villain_stack_bb)}</span>
-          </div>
-          <div className="board" aria-label={`Board no ${hand.street}`}>
-            <CardRow cards={hand.board} size="lg" />
-            <div className="pot">
-              Pote: <b>{bb(hand.pot_bb)}</b>
-              {hand.to_call_bb > 0 && !hand.finished && (
-                <>
-                  {" "}
-                  · a pagar <b>{bb(hand.to_call_bb)}</b> (equidade necessária{" "}
-                  {pct((100 * hand.to_call_bb) / (hand.pot_bb + hand.to_call_bb))})
-                </>
-              )}
-            </div>
-          </div>
-          <div className="hero">
-            <span className="seat hero-seat">Você: {hand.hero_position}</span>
-            <CardRow cards={hand.hero_cards} size="lg" />
-            <span className="stack">Stack: {bb(hand.hero_stack_bb)}</span>
-          </div>
-        </div>
+        <Felt hand={hand} />
 
         <EventLog v={hand} />
 
@@ -400,52 +595,8 @@ export function Hand({ nav }: { nav: Nav }) {
 
         {hand.finished && o && (
           <>
-            <div className={`card-panel highlight result-${o.winner}`} role="status">
-              <h2>{o.summary}</h2>
-              <div className="stats-row">
-                <div className="stat">
-                  <span className="stat-v">{signedBb(o.hero_net_bb)}</span>
-                  <span className="stat-l">Resultado no pós-flop (pote de {bb(o.pot_bb)})</span>
-                </div>
-                {o.hero_total_bb != null && (
-                  <div className="stat">
-                    <span className="stat-v">{signedBb(o.hero_total_bb)}</span>
-                    <span className="stat-l">Na mão, contando o pré-flop</span>
-                  </div>
-                )}
-                <div className="stat">
-                  <span className="stat-v">{bb(hand.summary.total_loss_bb, 3)}</span>
-                  <span className="stat-l">
-                    Perda de EV nas suas decisões ({hand.summary.graded} de {hand.summary.decisions} avaliadas)
-                  </span>
-                </div>
-              </div>
-              {o.showdown && (
-                <p>
-                  Você: {o.hero_hand} · Adversário ({hand.villain_cards?.join("")}): {o.villain_hand}
-                </p>
-              )}
-              {o.rake_bb > 0 && <p className="small">Rake: {bb(o.rake_bb)}</p>}
-              <p className="muted small">
-                O resultado é a sorte da mão; a perda de EV mede a qualidade das decisões contra a estratégia do motor.
-                Uma mão ganha com erros continua com erros.
-              </p>
-            </div>
-            {hand.cut && <div className="alert">{hand.cut}</div>}
-            <h2>Suas decisões</h2>
-            {hand.decisions.length === 0 && <p className="muted">A mão terminou sem decisões suas.</p>}
-            {hand.decisions.map((d) => (
-              <details key={d.seq} className="decision-review" open={d.feedback?.grade === "mistake" || d.feedback?.grade === "inaccuracy"}>
-                <summary>
-                  <b>{d.street}</b> {d.board.join(" ")} · pote {bb(d.pot_bb)} · você: {d.chosen_label} ·{" "}
-                  <span className={d.feedback ? `grade-${d.feedback.grade}` : ""}>
-                    {d.feedback ? GRADE_LABEL[d.feedback.grade] : "sem avaliação"}
-                    {d.feedback && d.feedback.loss_bb > 0 ? ` (−${bb(d.feedback.loss_bb, 3)})` : ""}
-                  </span>
-                </summary>
-                <DecisionDetail d={d} />
-              </details>
-            ))}
+            <OutcomePanel hand={hand} />
+            <DecisionList hand={hand} />
           </>
         )}
       </section>
@@ -562,6 +713,7 @@ export function Hand({ nav }: { nav: Nav }) {
                 <th>Board</th>
                 <th>Resultado</th>
                 <th>Perda de EV</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -576,6 +728,11 @@ export function Hand({ nav }: { nav: Nav }) {
                   <td>{r.ended_at ? signedBb(r.hero_net_bb ?? 0) : "interrompida"}</td>
                   <td>
                     {bb(r.total_loss_bb, 3)} ({r.graded}/{r.decisions})
+                  </td>
+                  <td>
+                    <button className="small" onClick={() => void openReview(r.id)} aria-label={`Rever mão ${r.hero_combo} x ${r.villain_combo}`}>
+                      Rever
+                    </button>
                   </td>
                 </tr>
               ))}
