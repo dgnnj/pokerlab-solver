@@ -45,6 +45,7 @@ jobs:
           test -n "$UPDATER_PUBKEY" || { echo "vars.UPDATER_PUBKEY not set"; exit 1; }
           node scripts/release-config.mjs "${{ github.repository }}" "$UPDATER_PUBKEY" > release.conf.json
       - uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # action-v1.0.0
+        id: tauri
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -63,4 +64,10 @@ jobs:
           args: --config release.conf.json
       - name: SHA-256 of the installer (for audit and manual downloads)
         shell: bash
-        run: sha256sum target/release/bundle/nsis/*.exe | tee SHA256SUMS.txt
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_ID: ${{ steps.tauri.outputs.releaseId }}
+        run: |
+          cd target/release/bundle/nsis
+          sha256sum *.exe | tee "$GITHUB_WORKSPACE/SHA256SUMS.txt"
+          gh api --method POST -H "Content-Type: text/plain" "https://uploads.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID/assets?name=SHA256SUMS.txt" --input "$GITHUB_WORKSPACE/SHA256SUMS.txt" --jq .name
