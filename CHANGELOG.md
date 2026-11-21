@@ -1,6 +1,6 @@
 # Changelog
 
-## Não lançado
+## 0.3.1 — 2026-11-21
 - Exportar mãos completas (CSV): uma linha por decisão, com os dados da mão (cartas, board, linha, resultado) e a avaliação de cada decisão. Botão no histórico de mãos e em Configurações.
 - Correção: o motivo de corte da nota na mão completa mostrava "frequência acumulada 0.000000%"; agora diz "abaixo de 0,001%" (o limite real).
 
