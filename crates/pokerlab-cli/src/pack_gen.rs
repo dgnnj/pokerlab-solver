@@ -41,31 +41,6 @@ fn default_depth() -> usize {
 /// Minimum joint reach (relative to the root) for a node to become an exercise.
 pub const MIN_EXERCISE_REACH: f32 = 0.02;
 
-fn is_street_marker(l: &str) -> bool {
-    l.starts_with("Turn: ") || l.starts_with("River: ")
-}
-
-/// Splits the readable line into (previous street actions, current street actions).
-fn street_segments(line: &[String]) -> (Vec<&str>, Vec<&str>) {
-    let marks: Vec<usize> = (0..line.len())
-        .filter(|&i| is_street_marker(&line[i]))
-        .collect();
-    match marks.as_slice() {
-        [] => (vec![], line.iter().map(String::as_str).collect()),
-        [.., last] => {
-            let prev_start = if marks.len() >= 2 {
-                marks[marks.len() - 2] + 1
-            } else {
-                0
-            };
-            (
-                line[prev_start..*last].iter().map(String::as_str).collect(),
-                line[last + 1..].iter().map(String::as_str).collect(),
-            )
-        }
-    }
-}
-
 /// Theme assignment from the node shape: street, how the previous street went, who acts and
 /// whether they face a bet or a raise. Flop keys are unchanged from pack 1.0.0.
 pub fn theme_for(node: &NodeSolution, spot: &SpotConfig) -> Option<(String, String, u8)> {
@@ -75,50 +50,14 @@ pub fn theme_for(node: &NodeSolution, spot: &SpotConfig) -> Option<(String, Stri
     if node.reach < MIN_EXERCISE_REACH {
         return None; // line almost never played in equilibrium
     }
-    let pos = &node.position;
-    let street = node.street.label_pt();
-    let (prev, cur) = street_segments(&node.line);
-    let facing_raise = cur
-        .iter()
-        .any(|l| l.contains("aumenta") || l.contains("all-in"));
-    let is_ip = *pos == spot.ip_position;
-    let (key, what, level) = if node.to_call_chips == 0 {
-        if is_ip {
-            ("ip_bet_or_check", "apostar ou passar após check", 1u8)
-        } else {
-            ("oop_lead", "liderar ou passar", 1)
-        }
-    } else if facing_raise {
-        ("vs_raise", "enfrentar aumento", 3)
-    } else {
-        ("vs_bet", "enfrentar aposta", 2)
-    };
-    let (prior_key, prior_label) = if node.street == poker_core::spot::Street::Flop {
-        ("", String::new())
-    } else if prev
-        .iter()
-        .any(|l| l.contains("aposta") || l.contains("aumenta"))
-    {
-        ("_after_bet", " após aposta paga".to_string())
-    } else {
-        ("_after_check", " após check-check".to_string())
-    };
-    let level = match node.street {
-        poker_core::spot::Street::Flop => level,
-        poker_core::spot::Street::Turn => (level + 1).min(3),
-        poker_core::spot::Street::River => 3,
-    };
-    Some((
-        format!(
-            "{}_{}{}_{}",
-            spot.pot_type.to_lowercase(),
-            street,
-            prior_key,
-            key
-        ),
-        format!("{pos} no {street}{prior_label}: {what}"),
-        level,
-    ))
+    let t = poker_core::theme::classify(
+        node.street,
+        &node.line,
+        node.to_call_chips,
+        &node.position,
+        spot,
+    );
+    Some((t.key, t.label, t.level))
 }
 
 pub fn exercises_for(sol: &SolutionFile) -> Vec<ExerciseDef> {

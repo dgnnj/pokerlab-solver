@@ -317,7 +317,12 @@ fn hand_act(
     decision_ms: Option<i64>,
 ) -> CmdResult<handplay::HandView> {
     with_trainer(&state, |t| {
-        state.hands.act(&t.db, &token, action, decision_ms)
+        let t = &*t;
+        state
+            .hands
+            .act(&t.db, &token, action, decision_ms, &|ex, combo, theme| {
+                t.review_match(ex, combo, theme)
+            })
     })
 }
 

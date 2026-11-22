@@ -1,7 +1,7 @@
 // End-to-end test of the full-hand simulation in the real app (real pack, real engine, real
 // SQLite), driven through the WebView2 DevTools protocol. Flow: open "Mão completa" -> solve a
 // flop tree in the background (progress visible, UI responsive) -> play hands to the end ->
-// history -> close -> reopen -> history persisted.
+// history -> close -> reopen -> history persisted -> mistakes of the hands in the spaced review.
 //
 // Usage:
 //   node tests/e2e/hand-sim.mjs --exe <pokerlab.exe> --pack src-tauri/resources/packs/btn-vs-bb-srp-100bb \
@@ -102,6 +102,8 @@ await page.getByRole("button", { name: `Jogar mão no board ${board}` }).click()
 for (let h = 0; h < hands; h++) {
   if (h > 0) await page.keyboard.press("Enter");
   let steps = 0;
+  // Wait for the new hand to render (the hero always has a decision before it can end).
+  await page.locator(".actions .action").first().waitFor();
   const villainHiddenAtStart = (await page.locator(".card-back").count()) === 2;
   for (;;) {
     await page.waitForFunction(() => document.querySelector(".actions .action") || document.querySelector(".result-hero, .result-villain, .result-split"));
@@ -130,10 +132,19 @@ for (let h = 0; h < hands; h++) {
   const log_ = await page.locator(".hand-log").innerText();
   const potShown = (await page.locator(".board .pot b").first().innerText()).trim();
   if (!result.includes(`pote de ${potShown}`)) fail(`pote na mesa (${potShown}) difere do pote disputado`);
-  played.push({ result: result.split("\n")[0], steps, boardCards, reviews });
+  // Inaccuracies and mistakes: each one says whether it went to the spaced review.
+  const notes = await page.locator(".decision-review .review-note").allTextContents();
+  const queued = notes.filter((n) => n.startsWith("Foi para a revisão")).length;
+  const bad = reviews.filter((r) => /Imprecisão|Erro/.test(r)).length;
+  if (notes.length !== bad) fail(`${notes.length} avisos de revisão para ${bad} imprecisões/erros`);
+  const queuedText = await page.locator(".review-queued").allInnerTexts();
+  if (queued > 0 && !(queuedText[0] ?? "").startsWith(`${queued} decis`)) fail(`resumo da revisão: "${queuedText[0]}" (esperado ${queued})`);
+  if (queued === 0 && queuedText.length) fail(`resumo da revisão sem item na fila: ${queuedText[0]}`);
+  played.push({ result: result.split("\n")[0], steps, boardCards, reviews, queued });
   log(`mão ${h + 1}: ${result.split("\n")[0]} | ${steps} decisões | board ${boardCards} cartas`);
   log(`  ação: ${log_.replace(/\n/g, " / ")}`);
   for (const r of reviews) log(`  - ${r}`);
+  for (const n of notes) log(`    revisão: ${n}`);
   if (!villainHiddenAtStart) fail("cartas do adversário visíveis durante a mão");
   if (!villainShown) fail("cartas do adversário não reveladas no fim");
   if (reviews.length !== steps) fail(`revisão lista ${reviews.length} de ${steps} decisões`);
@@ -169,6 +180,8 @@ async function checkReview(label) {
   if (!villainShown) fail(`revisão (${label}) sem as cartas do adversário`);
   if (boardCards !== last.boardCards) fail(`revisão (${label}): board com ${boardCards} cartas`);
   if (result.split("\n")[0] !== last.result) fail(`revisão (${label}): resultado "${result.split("\n")[0]}"`);
+  const notes = await page.locator(".decision-review .review-note").allTextContents();
+  if (notes.filter((n) => n.startsWith("Foi para a revisão")).length !== last.queued) fail(`revisão (${label}): avisos de fila diferentes`);
   await page.screenshot({ path: path.join(shots, `07-revisao-${label}.png`), fullPage: true });
   await page.getByRole("button", { name: "Voltar" }).click();
   await page.getByRole("heading", { name: "Histórico de mãos" }).waitFor();
@@ -189,10 +202,30 @@ const rows2 = await page.locator("table tbody tr").allInnerTexts();
 const finished = await page.locator(".stat .stat-v").first().innerText();
 await page.screenshot({ path: path.join(shots, "06-historico-apos-reabrir.png"), fullPage: true });
 await checkReview("apos-reabrir");
+
+// Spaced review: the queued mistakes of the hands are due now (fresh data dir: nothing else).
+const queuedTotal = played.reduce((a, p) => a + p.queued, 0);
+await page.getByRole("button", { name: "Início", exact: true }).first().click();
+await page.getByRole("heading", { name: "Início" }).waitFor();
+await page
+  .locator(".tile", { hasText: `${queuedTotal} situação(ões) para revisar agora` })
+  .waitFor({ timeout: 10000 })
+  .catch(() => undefined);
+const dueText = await page.locator(".tile", { hasText: "Revisar erros" }).innerText();
+log(`revisão espaçada: ${queuedTotal} decisões na fila; início diz "${dueText.split("\n")[1]}"`);
+if (!dueText.includes(`${queuedTotal} situação(ões) para revisar agora`)) fail(`fila de revisão: "${dueText}" (esperado ${queuedTotal})`);
+if (queuedTotal > 0) {
+  await page.locator(".tile", { hasText: "Revisar erros" }).click();
+  await page.getByRole("button", { name: "Começar" }).click();
+  const head = await page.getByText(/Revisão de erro em mão completa: /).first().innerText();
+  log(`primeiro item: ${head}`);
+  await page.screenshot({ path: path.join(shots, "08-revisao-espacada.png"), fullPage: true });
+}
 await browser.close();
 await shutdown(child);
 
 if (rows2.length !== hands) fail(`após reabrir: ${rows2.length} linhas`);
+if (played.reduce((a, p) => a + p.queued, 0) === 0) log("aviso: nenhuma decisão entrou na fila; rode com outro board/posição para cobrir o item de revisão");
 if (Number(finished) !== hands) fail(`após reabrir: ${finished} mãos concluídas`);
 log("histórico após reabrir:\n  " + rows2.map((r) => r.replace(/\t/g, " | ")).join("\n  "));
 console.log(ok ? "[e2e] OK" : "[e2e] FALHOU");

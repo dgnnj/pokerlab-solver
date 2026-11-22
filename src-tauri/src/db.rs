@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::Serialize;
 
-pub const SCHEMA_VERSION: i64 = 3;
+pub const SCHEMA_VERSION: i64 = 4;
 
 /// Migrations indexed by target version. Never edit a released migration; append a new one.
 const MIGRATIONS: &[(i64, &str)] = &[
@@ -159,6 +159,37 @@ CREATE INDEX hand_decisions_hand ON hand_decisions(hand_id);
 -- decision, so a past hand can be reviewed exactly as it was played. NULL for hands played
 -- before this migration.
 ALTER TABLE hands ADD COLUMN view_json TEXT;
+"#,
+    ),
+    (
+        4,
+        r#"
+-- Mistakes made in full hands join the spaced review: a review item now comes from a training
+-- attempt or from a hand decision (exactly one of the two). SQLite cannot relax NOT NULL in
+-- place, so the table is rebuilt with the same ids.
+CREATE TABLE reviews_v4 (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    attempt_id INTEGER UNIQUE REFERENCES attempts(id) ON DELETE CASCADE,
+    hand_decision_id INTEGER UNIQUE REFERENCES hand_decisions(id) ON DELETE CASCADE,
+    exercise_id TEXT NOT NULL,
+    combo TEXT NOT NULL,
+    theme TEXT NOT NULL,
+    tags TEXT NOT NULL DEFAULT '',
+    repetitions INTEGER NOT NULL DEFAULT 0,
+    last_reviewed_at TEXT,
+    next_review_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    manual INTEGER NOT NULL DEFAULT 0,
+    CHECK ((attempt_id IS NULL) <> (hand_decision_id IS NULL))
+);
+INSERT INTO reviews_v4(id, attempt_id, exercise_id, combo, theme, tags, repetitions, last_reviewed_at,
+    next_review_at, created_at, manual)
+SELECT id, attempt_id, exercise_id, combo, theme, tags, repetitions, last_reviewed_at,
+    next_review_at, created_at, manual FROM reviews;
+DROP TABLE reviews;
+ALTER TABLE reviews_v4 RENAME TO reviews;
+-- Theme of each hand decision (same classification as the pack exercises). NULL before v4.
+ALTER TABLE hand_decisions ADD COLUMN theme TEXT;
 "#,
     ),
 ];
@@ -440,7 +471,7 @@ mod tests {
             .unwrap();
         }
         let db = Db::open(&p).unwrap();
-        assert_eq!(db.schema_version().unwrap(), 3);
+        assert_eq!(db.schema_version().unwrap(), SCHEMA_VERSION);
         let (combo, view): (String, Option<String>) = db
             .conn
             .query_row("SELECT hero_combo, view_json FROM hands", [], |r| {
@@ -449,6 +480,67 @@ mod tests {
             .unwrap();
         assert_eq!(combo, "AhKh");
         assert!(view.is_none());
+    }
+
+    #[test]
+    fn v3_reviews_keep_ids_after_migration_to_v4() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("t.sqlite3");
+        {
+            let c = Connection::open(&p).unwrap();
+            for (_, sql) in &MIGRATIONS[..3] {
+                c.execute_batch(sql).unwrap();
+            }
+            c.pragma_update(None, "user_version", 3).unwrap();
+            c.execute_batch(
+                "INSERT INTO sessions(id, started_at, mode, target_count, pack_id, pack_version)
+                    VALUES (1, 'x', 'representative', 5, 'p', '1');
+                 INSERT INTO attempts(id, token, session_id, created_at, exercise_id, solution_id, node_id, pack_id,
+                    pack_version, engine_rev, combo, chosen_index, chosen_label, best_index, best_label,
+                    best_ev_chips, chosen_ev_chips, loss_chips, loss_bb, loss_pct_pot, grade, chosen_frequency,
+                    sampling_mode, decision_ms, theme, theme_label, street, position, pot_type, board, textures)
+                    VALUES (7, 't', 1, 'x', 's:x', 's', 'x', 'p', '1', 'e', 'AhKh', 0, 'Passa', 1, 'Aposta', 1.0,
+                    0.0, 1.0, 0.5, 10.0, 'mistake', 0.0, 'representative', 900, 'th', 'Th', 'flop', 'BTN', 'SRP',
+                    '9h6h3h', '');
+                 INSERT INTO reviews(id, attempt_id, exercise_id, combo, theme, tags, repetitions, next_review_at,
+                    created_at, manual) VALUES (5, 7, 's:x', 'AhKh', 'th', 'blefe', 2, 'n', 'c', 1);",
+            )
+            .unwrap();
+        }
+        let db = Db::open(&p).unwrap();
+        assert_eq!(db.schema_version().unwrap(), SCHEMA_VERSION);
+        let row: (i64, i64, Option<i64>, String, i64, bool) = db
+            .conn
+            .query_row(
+                "SELECT id, attempt_id, hand_decision_id, tags, repetitions, manual FROM reviews",
+                [],
+                |r| {
+                    Ok((
+                        r.get(0)?,
+                        r.get(1)?,
+                        r.get(2)?,
+                        r.get(3)?,
+                        r.get(4)?,
+                        r.get(5)?,
+                    ))
+                },
+            )
+            .unwrap();
+        assert_eq!(row, (5, 7, None, "blefe".to_string(), 2, true));
+        // Exactly one origin per item.
+        let orphan = db.conn.execute(
+            "INSERT INTO reviews(exercise_id, combo, theme, next_review_at, created_at)
+             VALUES ('s:x', 'AhKh', 'th', 'n', 'c')",
+            [],
+        );
+        assert!(orphan.is_err());
+        // Deleting the attempt still removes its review item.
+        db.conn.execute("DELETE FROM attempts", []).unwrap();
+        let n: i64 = db
+            .conn
+            .query_row("SELECT COUNT(*) FROM reviews", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(n, 0);
     }
 
     #[test]

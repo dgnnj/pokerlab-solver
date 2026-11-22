@@ -7,7 +7,9 @@ use std::time::{Duration, Instant};
 
 use poker_core::spot::SpotConfig;
 use pokerlab_lib::db::Db;
-use pokerlab_lib::handplay::{export_csv, history, review, BoardSource, EngineStatus, HandEngine};
+use pokerlab_lib::handplay::{
+    export_csv, history, review, BoardSource, EngineStatus, HandEngine, ReviewMatch,
+};
 
 fn source(name: &str, id: &str) -> BoardSource {
     let p = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(format!("../data/spots/{name}"));
@@ -19,6 +21,20 @@ fn source(name: &str, id: &str) -> BoardSource {
         pack_exploitability_pct: 0.5,
         pack_id: "test".into(),
         pack_version: "0".into(),
+    }
+}
+
+/// Stand-in for the pack lookup: no equivalent for raises, otherwise exact or same theme
+/// depending on the node (deterministic, so both kinds show up).
+fn fake_lookup(exercise_id: &str, combo: &str, theme: &str) -> ReviewMatch {
+    assert!(exercise_id.starts_with("turn:"), "{exercise_id}");
+    assert_eq!(combo.len(), 4);
+    if theme.ends_with("_vs_raise") {
+        ReviewMatch::None
+    } else if exercise_id.len().is_multiple_of(2) {
+        ReviewMatch::Exact
+    } else {
+        ReviewMatch::Theme
     }
 }
 
@@ -84,12 +100,14 @@ fn hands_are_played_against_the_engine_and_persisted() {
                 } else {
                     v.actions.len() - 1
                 };
-                v = engine.act(&db, &v.token, a, Some(500)).unwrap();
+                v = engine
+                    .act(&db, &v.token, a, Some(500), &fake_lookup)
+                    .unwrap();
                 guard += 1;
                 assert!(guard < 20);
             }
             assert!(
-                engine.act(&db, &v.token, 0, None).is_err(),
+                engine.act(&db, &v.token, 0, None, &fake_lookup).is_err(),
                 "mão já encerrada"
             );
             let o = v.outcome.clone().unwrap();
@@ -100,6 +118,12 @@ fn hands_are_played_against_the_engine_and_persisted() {
             }
             for d in &v.decisions {
                 assert!(d.feedback.is_some() != d.not_evaluable.is_some());
+                // Inaccuracies and mistakes (and only those) carry a review outcome.
+                let bad = d
+                    .feedback
+                    .as_ref()
+                    .is_some_and(|f| matches!(f.grade.as_str(), "inaccuracy" | "mistake"));
+                assert_eq!(d.review.is_some(), bad);
                 if let Some(f) = &d.feedback {
                     assert!(f.loss_bb >= 0.0 && !d.explanation.is_empty());
                 }
@@ -134,6 +158,52 @@ fn hands_are_played_against_the_engine_and_persisted() {
         .recent
         .iter()
         .all(|r| r.ended_at.is_some() && r.line.is_some()));
+
+    // Spaced review: one item per queued decision, linked to it, with its theme and the hero hand.
+    let queued: usize = finished.iter().map(|v| v.summary.review_queued).sum();
+    let bad: usize = finished
+        .iter()
+        .flat_map(|v| &v.decisions)
+        .filter(|d| d.review.is_some())
+        .count();
+    assert!(bad > 0, "nenhuma imprecisão/erro nas mãos do teste");
+    let items: Vec<(String, String, String, String, String, String)> = db
+        .conn
+        .prepare(
+            "SELECT r.exercise_id, r.combo, r.theme, d.node_id, d.theme, h.hero_combo
+             FROM reviews r JOIN hand_decisions d ON d.id = r.hand_decision_id
+             JOIN hands h ON h.id = d.hand_id WHERE r.attempt_id IS NULL",
+        )
+        .unwrap()
+        .query_map([], |r| {
+            Ok((
+                r.get(0)?,
+                r.get(1)?,
+                r.get(2)?,
+                r.get(3)?,
+                r.get(4)?,
+                r.get(5)?,
+            ))
+        })
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap();
+    assert_eq!(items.len(), queued);
+    for (ex, combo, theme, node, d_theme, hero) in &items {
+        assert_eq!(ex, &format!("turn:{node}"));
+        assert_eq!(theme, d_theme);
+        assert_eq!(combo, hero);
+        assert_ne!(fake_lookup(ex, combo, theme), ReviewMatch::None);
+    }
+    let untagged: i64 = db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM hand_decisions WHERE theme IS NULL",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(untagged, 0, "toda decisão tem tema");
 
     // CSV export: one row per decision, plus one row for a hand interrupted before any decision.
     let interrupted = engine.start(&db, "BB").unwrap();

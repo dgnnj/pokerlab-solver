@@ -1,5 +1,10 @@
 # Changelog
 
+## Não lançado
+- Erros das mãos completas na revisão espaçada: uma decisão com nota Imprecisão ou Erro entra na fila de "Revisar erros". Se o ponto da árvore é um exercício do pacote, a revisão repete a mesma situação com a mesma mão; senão, traz outra situação do mesmo tema. Quando o pacote não tem exercícios daquele tipo de decisão (por exemplo, o BB liderando no flop), a decisão não entra na fila e a mão avisa. Cada decisão diz o que aconteceu, e o fim da mão mostra quantas foram para a revisão.
+- Tema de cada decisão da mão (mesma classificação dos exercícios do pacote) gravado e exportado no CSV das mãos (coluna `theme`).
+- Banco schema v4 (migração com backup automático): item de revisão vem de um exercício ou de uma decisão de mão.
+
 ## 0.3.2 — 2026-11-21
 - Rever mãos antigas: botão "Rever" no histórico de mãos abre a mão como foi jogada (mesa, ação, resultado, nota e explicação de cada decisão), sem resolver o board de novo. Mãos interrompidas mostram o estado na última decisão.
 - Banco schema v3 (migração com backup automático): instantâneo de cada mão em `hands.view_json`. Mãos jogadas até a v0.3.1 aparecem na revisão só com os dados gravados de cada decisão.

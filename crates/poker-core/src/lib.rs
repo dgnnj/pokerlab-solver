@@ -10,6 +10,7 @@ pub mod sampling;
 pub mod solution;
 pub mod spot;
 pub mod texture;
+pub mod theme;
 
 #[derive(Debug, thiserror::Error, Clone, PartialEq)]
 pub enum CoreError {

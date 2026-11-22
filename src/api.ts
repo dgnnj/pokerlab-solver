@@ -279,6 +279,8 @@ export interface HandDecision {
   equity: number | null;
   tolerance_bb: number | null;
   not_evaluable: string | null;
+  /** Spaced review outcome of an inaccuracy or mistake (absent in hands played before v0.3.3). */
+  review?: "exact" | "theme" | "none" | null;
 }
 
 export interface HandOutcome {
@@ -301,6 +303,8 @@ export interface HandSummary {
   total_loss_bb: number;
   avg_loss_bb: number;
   grades: Record<string, number>;
+  /** Decisions sent to the spaced review (absent in hands played before v0.3.3). */
+  review_queued?: number;
 }
 
 export interface HandView {
