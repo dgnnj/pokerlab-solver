@@ -3,13 +3,17 @@
 // updates and verifies version, health banner and preserved history.
 //
 // Usage (setup.exe downloaded from the older release):
-//   node tests/e2e/updater-live.mjs --setup <PokerLab_X_x64-setup.exe> --from 0.3.0 --to 0.3.1 \
-//        --data out/updater-live-data --shots out/updater-live-shots
+//   node tests/e2e/updater-live.mjs --setup <PokerLab_X_x64-setup.exe> --from 0.3.2 --to 0.3.3 \
+//        [--data <dir>] [--shots out/updater-live-shots] [--timeout 600]
 //
-// Installs into %LOCALAPPDATA%\PokerLab (same place as a real install); user data goes to --data.
+// Installs into %LOCALAPPDATA%\PokerLab (same place as a real install); user data goes to --data,
+// by default under the system temp dir: with the data dir in a OneDrive-synced folder the run
+// once hung with no output and, in another run, the app never created its database there.
+// The whole run aborts after --timeout seconds.
 import { chromium } from "playwright-core";
 import { spawn, execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, rmSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 const arg = (n, d) => {
@@ -19,7 +23,7 @@ const arg = (n, d) => {
 const setup = path.resolve(arg("setup", ""));
 const from = arg("from", "0.3.0");
 const to = arg("to", "0.3.1");
-const data = path.resolve(arg("data", "out/updater-live-data"));
+const data = path.resolve(arg("data", path.join(os.tmpdir(), "pokerlab-updater-live-data")));
 const shots = path.resolve(arg("shots", "out/updater-live-shots"));
 const port = Number(arg("port", "9335"));
 const exe = path.join(process.env.LOCALAPPDATA, "PokerLab", "pokerlab.exe");
@@ -77,14 +81,22 @@ async function closeApp(child, browser) {
 }
 const sidebarVersion = async (page) => (await page.locator(".sidebar-foot").innerText()).trim();
 
+const timeoutS = Number(arg("timeout", "600"));
+setTimeout(() => {
+  log(`FALHA tempo limite de ${timeoutS} s excedido; encerrando`);
+  killAll();
+  process.exit(1);
+}, timeoutS * 1000).unref();
+
 if (!existsSync(setup)) throw new Error(`--setup não encontrado: ${setup}`);
+log(`dados em ${data}`);
 rmSync(data, { recursive: true, force: true });
 mkdirSync(data, { recursive: true });
 mkdirSync(shots, { recursive: true });
 
 // ---------- 0. install the published older release ----------
 killAll();
-execFileSync(setup, ["/S"]);
+execFileSync(setup, ["/S"], { timeout: 180000 }); // sync call: the run timer cannot fire meanwhile
 check(`instalar ${from} publicada (NSIS silencioso)`, fileVersion() === from, `${exe} = ${fileVersion()}`);
 
 // ---------- 1. offered from the public feed; postpone; create history ----------
