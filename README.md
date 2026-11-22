@@ -15,11 +15,11 @@ Especificação: `Especificacao_Treinador_Poker_Cash_Game.md` (v1.0). Decisões:
 | Persistência após fechar e reabrir | **Executado** (E2E no app instalado) |
 | Instalador NSIS por usuário | **Executado** nesta máquina (Windows 11 Pro) |
 | Updater 0.1.0 → 0.1.1 com feed local e chave dev, incl. falhas | **Executado** (11/11 checks) |
-| Updater real 0.3.0 → 0.3.1 pelo feed público (chave de produção), com adiar e histórico preservado | **Executado** nesta máquina (8/8 passos; `%LOCALAPPDATA%` virtualizado, não substitui a VM limpa) |
-| CI (`ci.yml`) e release (`release.yml`) no GitHub | **Executado** (releases v0.1.0 a v0.3.1 publicadas) |
+| Updater real pelo feed público (chave de produção), com adiar e histórico preservado | **Executado** nesta máquina: 0.3.0 → 0.3.1 e 0.3.1 → 0.3.2 (8/8 passos cada; na 0.3.2 o banco migrou do schema v2 para o v3 com backup antes; `%LOCALAPPDATA%` virtualizado, não substitui a VM limpa) |
+| CI (`ci.yml`) e release (`release.yml`) no GitHub | **Executado** (releases v0.1.0 a v0.3.2 publicadas) |
 | Teste em VM Windows 11 limpa, SmartScreen, Authenticode | **Pendente** |
-| Publicação com chave de produção e feed `dgnnj/pokerlab-solver` | **Executado** (v0.3.1 é a Latest; `latest.json` assinado e verificado contra a chave pública de produção) |
-| Simulação de mão completa (flop ao river contra a política do motor), árvore do flop resolvida no app | **Executado** no build release (E2E via WebView2: 9h6h3h como BB e 8s7s5d como BTN, 3 mãos cada, histórico após reabrir); publicada na v0.3.0; exportação das mãos em CSV publicada na v0.3.1 (E2E rodou no build release, não no instalador baixado do feed) |
+| Publicação com chave de produção e feed `dgnnj/pokerlab-solver` | **Executado** (v0.3.2 é a Latest; `latest.json` assinado e verificado contra a chave pública de produção) |
+| Simulação de mão completa (flop ao river contra a política do motor), árvore do flop resolvida no app | **Executado** no build release (E2E via WebView2: 9h6h3h como BB e 8s7s5d como BTN, 3 mãos cada, histórico após reabrir); publicada na v0.3.0; exportação das mãos em CSV publicada na v0.3.1; revisão de mãos antigas publicada na v0.3.2 (E2E rodou no build release, não no instalador baixado do feed) |
 
 ## Pré-requisitos
 
@@ -105,8 +105,8 @@ node tests/e2e/updater.mjs
 Atualização real pelo feed público, depois de publicar uma release (instala a anterior em `%LOCALAPPDATA%\PokerLab`; dados em `--data`):
 
 ```bash
-gh release download v0.3.0 -p 'PokerLab_0.3.0_x64-setup.exe' -D out/updater-live
-node tests/e2e/updater-live.mjs --setup out/updater-live/PokerLab_0.3.0_x64-setup.exe --from 0.3.0 --to 0.3.1
+gh release download v0.3.1 -p 'PokerLab_0.3.1_x64-setup.exe' -D out/updater-live
+node tests/e2e/updater-live.mjs --setup out/updater-live/PokerLab_0.3.1_x64-setup.exe --from 0.3.1 --to 0.3.2
 ```
 
 ## Estrutura
@@ -129,7 +129,7 @@ O pacote só guarda as linhas principais, então a mão inteira usa a árvore co
 
 - Mãos privadas sorteadas juntas pelos pesos dos ranges, sem cartas em comum; o adversário sorteia cada ação pela estratégia da mão dele no nó; turn e river saem do baralho restante. All-in pago antes do river é nó terminal no motor (ele faz a média dos runouts), então o app distribui as cartas restantes para o showdown.
 - Cada decisão é avaliada pela perda de EV no mesmo nó e mão. Se a sua linha leva a mão a peso praticamente nulo na solução (< 0,001% do peso inicial), a nota termina na última decisão avaliável e o motivo aparece.
-- Resultado no pós-flop (o pote inicial conta para quem leva) separado da qualidade das decisões. Histórico em `hands` / `hand_decisions` (schema v2; migração com backup).
+- Resultado no pós-flop (o pote inicial conta para quem leva) separado da qualidade das decisões. Histórico em `hands` / `hand_decisions` (criadas no schema v2; migrações com backup).
 - Rever mãos antigas: "Rever" no histórico abre a mão como foi jogada (mesa, cartas dos dois, ação, resultado e a nota de cada decisão com tabela de ações e explicação), lida do banco, sem precisar resolver o board de novo. O app grava um instantâneo da mão a cada decisão (`hands.view_json`, schema v3). Mãos jogadas até a v0.3.1 não têm instantâneo e mostram só os dados gravados de cada decisão.
 - Exportar mãos completas (CSV), no histórico de mãos ou em Configurações: grava `exports\pokerlab-maos-<timestamp>.csv` com uma linha por decisão do aluno e os dados da mão repetidos em cada linha (cartas dos dois, board final, linha, vencedor, resultado, nota, EVs, frequência, equidade, motivo de corte). Mão interrompida antes da primeira decisão sai com uma linha e as colunas da decisão vazias; `ended_at` vazio indica mão interrompida.
 
