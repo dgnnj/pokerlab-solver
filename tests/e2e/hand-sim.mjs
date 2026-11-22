@@ -4,7 +4,7 @@
 // history -> close -> reopen -> history persisted -> mistakes of the hands in the spaced review.
 //
 // Usage:
-//   node tests/e2e/hand-sim.mjs --exe <pokerlab.exe> --pack src-tauri/resources/packs/btn-vs-bb-srp-100bb \
+//   node tests/e2e/hand-sim.mjs --exe <pokerlab.exe> --pack src-tauri/resources/packs [--spot "BB x BTN"] \
 //        --data out/e2e-hand-data --shots out/e2e-hand-shots --board 9h6h3h --hands 3 --hero BB
 import { chromium } from "playwright-core";
 import { spawn, execFileSync } from "node:child_process";
@@ -22,8 +22,9 @@ const shots = path.resolve(arg("shots", "out/e2e-hand-shots"));
 const port = Number(arg("port", "9334"));
 const board = arg("board", "9h6h3h");
 const hands = Number(arg("hands", "3"));
-const hero = arg("hero", "BB"); // BB | BTN | random
-const HERO_LABEL = { BB: "BB (fora de posição)", BTN: "BTN (em posição)", random: "Aleatória" };
+const hero = arg("hero", "BB"); // a position of the spot (BB, BTN, CO, SB) | random
+const spot = arg("spot", ""); // short pack name (e.g. "BB x BTN") when --pack is a folder with several packs
+const heroLabel = hero === "random" ? "Aleatória" : new RegExp(`^\\s*${hero} \\((fora de|em) posição\\)\\s*$`);
 
 rmSync(data, { recursive: true, force: true });
 mkdirSync(data, { recursive: true });
@@ -79,8 +80,14 @@ let { browser, page } = await connect();
 await page.getByRole("heading", { name: "Início" }).waitFor({ timeout: 60000 });
 await page.getByRole("button", { name: "Mão completa", exact: true }).first().click();
 await page.getByRole("heading", { name: "Mão completa" }).waitFor();
+if (spot) {
+  const spotSelect = page.getByLabel("Spot", { exact: true });
+  const value = await spotSelect.locator("option", { hasText: spot }).first().getAttribute("value");
+  await spotSelect.selectOption(value);
+  log(`spot: ${spot} (${value})`);
+}
 await page.getByLabel("Board (flop)").selectOption({ label: board });
-await page.getByLabel(HERO_LABEL[hero]).check();
+await page.getByLabel(heroLabel).check();
 await page.getByRole("button", { name: `Resolver ${board}` }).click();
 await page.getByText(/Resolvendo a árvore completa/).waitFor({ timeout: 10000 });
 await sleep(3000);
@@ -111,8 +118,16 @@ for (let h = 0; h < hands; h++) {
     const labels = await page.locator(".actions .action").allInnerTexts();
     // Avoid folding so hands reach later streets; alternate passive/aggressive.
     const choices = labels.map((l, i) => [l, i]).filter(([l]) => !/Desistir/.test(l));
+    if (!choices.length) continue; // list re-rendering
     const pick = choices[(h + steps) % choices.length][1];
-    await page.locator(".actions .action").nth(pick).click();
+    // The action list can re-render between reading it and clicking (next decision): read again.
+    const clicked = await page
+      .locator(".actions .action")
+      .nth(pick)
+      .click({ timeout: 5000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!clicked) continue;
     steps++;
     await page.waitForFunction((n) => {
       const d = document.querySelectorAll(".feedback").length;

@@ -36,8 +36,9 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Rust tests (domain, real solver, trainer on bundled pack)
         run: cargo test --workspace
-      - name: Bundled pack integrity
-        run: cargo run --release -p pokerlab-cli -- verify-pack src-tauri/resources/packs/btn-vs-bb-srp-100bb
+      - name: Bundled packs integrity
+        shell: bash
+        run: for p in src-tauri/resources/packs/*/; do cargo run --release -p pokerlab-cli -- verify-pack "$p" || exit 1; done
       - name: River PoC (solve, reload in a separate process, query)
         shell: bash
         run: |

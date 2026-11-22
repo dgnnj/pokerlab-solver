@@ -1,0 +1,77 @@
+# Template: NLHE cash 6-max, CO contra BB, pote com um único raise (SRP), 100 bb.
+# O board é substituído pelo gerador de pacotes (data/packs/co_vs_bb_srp_100bb.toml).
+#
+# Contabilidade (fichas; 100 fichas = 1 bb), blinds 0,5/1 bb sem ante:
+#   CO abre para 2,5 bb, BTN e SB desistem (0,5 bb morto), BB paga 1,5 bb a mais.
+#   Pote no flop = 2,5 + 2,5 + 0,5 = 5,5 bb (550 fichas). Stack efetivo = 100 - 2,5 = 97,5 bb (9750 fichas).
+# Rake: sem rake nesta versão (referência).
+
+id = "co_bb_srp100"
+version = 1
+title = "CO x BB, pote simples, 100 bb"
+oop_position = "BB"
+ip_position = "CO"
+pot_type = "SRP"
+initial_street = "flop"
+board = "Ks7d4c"
+chips_per_bb = 100
+starting_pot_chips = 550
+effective_stack_chips = 9750
+
+[preflop]
+starting_stack_chips = 10000
+line = "CO abre para 2,5 bb, BTN e SB desistem, BB paga"
+invested_per_player_chips = 250
+dead_chips = 50
+[preflop.blinds]
+sb_chips = 50
+bb_chips = 100
+ante_chips = 0
+
+[rake]
+rate = 0.0
+cap_chips = 0.0
+structure = "sem rake (referência; estrutura de sala ainda não definida)"
+
+# Mesma árvore do pacote BTN x BB 1.2.0 (BB pode liderar 33% no flop).
+[tree]
+turn_donk = ""
+river_donk = ""
+add_allin_threshold = 1.5
+force_allin_threshold = 0.15
+merging_threshold = 0.1
+[tree.oop.flop]
+bet = "33%"
+raise = "3x"
+[tree.ip.flop]
+bet = "33%, 75%"
+raise = "3x"
+[tree.oop.turn]
+bet = "75%"
+raise = "3x"
+[tree.ip.turn]
+bet = "75%"
+raise = "3x"
+[tree.oop.river]
+bet = "75%"
+raise = "3x"
+[tree.ip.river]
+bet = "75%"
+raise = "3x"
+
+[oop_range]
+text = "TT:0.5,99-22,AJs:0.5,ATs-A6s,A5s:0.5,A4s:0.5,A3s-A2s,KQs:0.5,KJs-K6s,K5s-K2s:0.75,QJs-Q6s,JTs-J7s,T9s-T7s,98s-96s,87s-86s,76s-75s,65s-64s,54s,AQo:0.5,AJo-ATo,A9o-A8o:0.5,KQo:0.75,KJo-KTo,QJo-QTo,JTo,T9o:0.3"
+source = "PokerLab — range de defesa do BB contra abertura 2,5 bb do CO (sem os 3-bets), rascunho 2026-11-22"
+manual_premise = true
+notes = "Premissa de estudo construída manualmente; não derivada de solução pré-flop. Mais apertado que a defesa contra o BTN porque o range do CO é mais forte. Pesos parciais representam mãos divididas entre call e 3-bet (ou fold)."
+
+[ip_range]
+text = "22+,A2s+,K5s+,Q8s+,J8s+,T8s+,97s+,86s+,76s,65s,54s,A9o+,KTo+,QTo+,JTo"
+source = "PokerLab — range de abertura do CO (~27%), rascunho 2026-11-22"
+manual_premise = true
+notes = "Premissa de estudo construída manualmente; não derivada de solução pré-flop."
+
+[solve]
+max_iterations = 1000
+target_exploitability_pct = 0.5
+memory_limit_mib = 12288

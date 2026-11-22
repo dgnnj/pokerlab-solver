@@ -29,7 +29,8 @@ fn msg<T>(m: impl Into<String>) -> R<T> {
 }
 
 /// Above this estimate the solve uses the engine's compressed storage (16-bit), about half the
-/// memory. Every board of the bundled pack fits uncompressed (largest ≈ 4.2 GiB).
+/// memory. Most bundled boards fit uncompressed; the largest SB x BB and BTN x BB boards
+/// (≈ 6.2–6.9 GiB) are solved compressed.
 pub const MEMORY_LIMIT_MIB: u64 = 6 * 1024;
 
 /// What the app needs to know about the pack solution a board comes from.

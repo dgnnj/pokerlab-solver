@@ -1,0 +1,40 @@
+# Pacote incluído no instalador.
+pack_id = "sb-vs-bb-srp-100bb"
+version = "1.0.0"
+title = "SB x BB — pote simples 100 bb (blind contra blind; flop, turn e river)"
+description = "Decisões após SB abrir 3 bb e BB pagar: c-bet fora de posição do SB, defesa e ataque do BB com posição, turn e river em linhas principais com cartas representativas."
+license = "Dados gerados pelo projeto PokerLab com postflop-solver (AGPL-3.0-or-later). Ranges próprios, premissas de estudo."
+provenance = "Gerado por `pokerlab-cli gen-pack` a partir de data/spots/sb_vs_bb_srp_100bb.toml; ranges manuais revisados em 2026-11-22; sem rake."
+template_spot = "../spots/sb_vs_bb_srp_100bb.toml"
+export_depth = 3
+max_exploitability_pct = 1.0
+
+# Mesmos 12 flops do pacote BTN x BB, para comparar os spots no mesmo board.
+boards = [
+  "Ah7c2d",
+  "Kd8s3h",
+  "Qh9c4s",
+  "Js9h8c",
+  "Td9d6h",
+  "8s7s5d",
+  "6c4d2h",
+  "KhKs5d",
+  "9h6h3h",
+  "AdQc5s",
+  "QsJd2c",
+  "7c7d2s",
+]
+
+# Turn: três linhas de flop, cinco cartas representativas cada. River: nas duas primeiras cartas
+# de turn de cada linha, depois de check-check e aposta-call no turn, três cartas representativas.
+[export]
+depth = 3
+[export.runouts]
+lines = ["x-x", "bS-c", "bL-c"]
+cards = 5
+depth = 2
+expand = 2
+[export.runouts.next]
+lines = ["x-x", "bS-c"]
+cards = 3
+depth = 2

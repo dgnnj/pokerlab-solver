@@ -125,7 +125,7 @@ export function Train({ nav, sessionId, returnTo }: { nav: Nav; sessionId: numbe
         <div>
           <h1>{ex.theme_label}</h1>
           <span className="muted">
-            {MODE_LABEL[ex.mode]} · decisão {Math.min(s.done + (fb ? 0 : 1), s.target_count)} de {s.target_count}
+            {ex.pack_name} · {MODE_LABEL[ex.mode]} · decisão {Math.min(s.done + (fb ? 0 : 1), s.target_count)} de {s.target_count}
             {ex.review_note && ` · ${ex.review_note}`}
           </span>
         </div>

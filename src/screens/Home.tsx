@@ -14,7 +14,7 @@ export function Home({ nav }: { nav: Nav }) {
 
   const quick = async (count: number) => {
     try {
-      const s = await api.startSession("representative", null, count);
+      const s = await api.startSession("representative", null, null, count);
       nav.go({ name: "train", sessionId: s.id });
     } catch (e) {
       setErr(errorText(e));
@@ -40,8 +40,9 @@ export function Home({ nav }: { nav: Nav }) {
         <div className="card-panel highlight">
           <h2>Bem-vindo!</h2>
           <p>
-            O pacote inicial <b>{info.pack_title}</b> foi instalado e validado ({info.pack_exercises} exercícios, offline).
-            Escolha seu perfil de treino:
+            {info.packs.length === 1 ? "O pacote" : `Os ${info.packs.length} pacotes`} de spots (
+            {info.packs.map((p) => p.name).join("; ")}) foram instalados e validados (
+            {info.packs.reduce((a, p) => a + p.exercises, 0)} exercícios, offline). Escolha seu perfil de treino:
           </p>
           <div className="row">
             <button onClick={() => chooseProfile("10")}>Curto — 10 decisões</button>
@@ -93,12 +94,16 @@ export function Home({ nav }: { nav: Nav }) {
         </button>
         <button className="tile" onClick={() => quick(Number(profile ?? "20"))}>
           <b>Treino rápido</b>
-          <span>{profile ?? "20"} decisões de todos os temas (amostra representativa).</span>
+          <span>
+            {profile ?? "20"} decisões de todos os temas{info && info.packs.length > 1 ? " e spots" : ""} (amostra
+            representativa).
+          </span>
         </button>
       </div>
       {info && (
         <p className="muted small">
-          Pacote {info.pack_id} v{info.pack_version} · motor postflop-solver @ {info.engine_rev.slice(0, 10)} · dados em{" "}
+          {info.packs.length === 1 ? "Pacote" : "Pacotes"} {info.packs.map((p) => `${p.pack_id} v${p.version}`).join(", ")} ·
+          motor postflop-solver @ {info.engine_rev.slice(0, 10)} · dados em{" "}
           {info.data_dir}
         </p>
       )}

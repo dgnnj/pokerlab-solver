@@ -1,0 +1,79 @@
+# Template: NLHE cash 6-max, SB contra BB (blind contra blind), pote com um único raise (SRP), 100 bb.
+# O board é substituído pelo gerador de pacotes (data/packs/sb_vs_bb_srp_100bb.toml).
+#
+# Contabilidade (fichas; 100 fichas = 1 bb), blinds 0,5/1 bb sem ante:
+#   Todos desistem até o SB, que abre para 3 bb (estratégia raise-or-fold); BB paga 2 bb a mais.
+#   Pote no flop = 3 + 3 = 6 bb (600 fichas), sem dinheiro morto. Stack efetivo = 100 - 3 = 97 bb (9700 fichas).
+#   O SB é o agressor pré-flop e joga fora de posição.
+# Rake: sem rake nesta versão (referência).
+
+id = "sb_bb_srp100"
+version = 1
+title = "SB x BB, pote simples, 100 bb"
+oop_position = "SB"
+ip_position = "BB"
+pot_type = "SRP"
+preflop_aggressor = "SB"
+initial_street = "flop"
+board = "Ks7d4c"
+chips_per_bb = 100
+starting_pot_chips = 600
+effective_stack_chips = 9700
+
+[preflop]
+starting_stack_chips = 10000
+line = "Todos desistem até o SB, SB abre para 3 bb, BB paga"
+invested_per_player_chips = 300
+dead_chips = 0
+[preflop.blinds]
+sb_chips = 50
+bb_chips = 100
+ante_chips = 0
+
+[rake]
+rate = 0.0
+cap_chips = 0.0
+structure = "sem rake (referência; estrutura de sala ainda não definida)"
+
+# SB (agressor, fora de posição) faz c-bet 33% ou 75%; BB aposta 50% depois do check.
+[tree]
+turn_donk = ""
+river_donk = ""
+add_allin_threshold = 1.5
+force_allin_threshold = 0.15
+merging_threshold = 0.1
+[tree.oop.flop]
+bet = "33%, 75%"
+raise = "3x"
+[tree.ip.flop]
+bet = "50%"
+raise = "3x"
+[tree.oop.turn]
+bet = "75%"
+raise = "3x"
+[tree.ip.turn]
+bet = "75%"
+raise = "3x"
+[tree.oop.river]
+bet = "75%"
+raise = "3x"
+[tree.ip.river]
+bet = "75%"
+raise = "3x"
+
+[oop_range]
+text = "22+,A2s+,K2s+,Q4s+,J6s+,T6s+,96s+,85s+,75s+,64s+,53s+,43s,A2o+,K8o+,Q9o+,J9o+,T8o+,98o"
+source = "PokerLab — range de abertura do SB contra o BB (~45%, raise-or-fold), rascunho 2026-11-22"
+manual_premise = true
+notes = "Premissa de estudo construída manualmente; não derivada de solução pré-flop. Sem limp."
+
+[ip_range]
+text = "TT:0.5,99-22,AJs:0.5,ATs-A2s,KJs:0.5,KTs-K2s,QJs-Q2s,JTs-J4s,T9s-T6s,98s-96s,87s-85s,76s-74s,65s-63s,54s-53s,43s,AQo:0.5,AJo-A2o,KQo:0.5,KJo-K5o,QJo-Q8o,JTo-J8o,T9o-T8o,98o-97o,87o,76o"
+source = "PokerLab — range de defesa do BB contra abertura 3 bb do SB (sem os 3-bets), rascunho 2026-11-22"
+manual_premise = true
+notes = "Premissa de estudo construída manualmente; não derivada de solução pré-flop. Defesa larga: o BB tem posição e paga 2 bb para um pote de 6 bb. Pesos parciais representam mãos divididas entre call e 3-bet."
+
+[solve]
+max_iterations = 1000
+target_exploitability_pct = 0.5
+memory_limit_mib = 12288

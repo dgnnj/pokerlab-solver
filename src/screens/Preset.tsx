@@ -2,9 +2,12 @@ import { useEffect, useState } from "react";
 import { api, errorText, ThemeInfo } from "../api";
 import type { Nav } from "../App";
 import { shortDate } from "../format";
+import { PackSelect, usePreferredPack } from "../components/PackSelect";
 
 /** Study preset (~30 min): 10 min review, 15 min single theme, 5 min writing a practical rule. */
 export function Preset({ nav, step }: { nav: Nav; step: number }) {
+  const packs = nav.info?.packs ?? [];
+  const [pack, setPack] = usePreferredPack(nav.info?.packs, false);
   const [themes, setThemes] = useState<ThemeInfo[]>([]);
   const [theme, setTheme] = useState("");
   const [note, setNote] = useState("");
@@ -13,18 +16,21 @@ export function Preset({ nav, step }: { nav: Nav; step: number }) {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    void api.listThemes().then((t) => {
-      setThemes(t);
-      if (t.length) setTheme(t[0].theme);
-    });
     void api.listNotes().then(setNotes).catch(() => undefined);
   }, []);
+  useEffect(() => {
+    if (!pack) return;
+    void api.listThemes(pack).then((t) => {
+      setThemes(t);
+      setTheme(t.length ? t[0].theme : "");
+    });
+  }, [pack]);
 
   const due = nav.info?.review_due ?? 0;
 
   const run = async (mode: "review" | "representative", count: number, th: string | null, nextStep: number) => {
     try {
-      const s = await api.startSession(mode, th, count);
+      const s = await api.startSession(mode, mode === "review" ? null : pack, th, count);
       nav.go({ name: "train", sessionId: s.id, returnTo: { name: "preset", step: nextStep } });
     } catch (e) {
       setErr(errorText(e));
@@ -50,9 +56,10 @@ export function Preset({ nav, step }: { nav: Nav; step: number }) {
         </li>
         <li className={step === 1 ? "current" : step > 1 ? "done" : ""}>
           <b>2. Treino de um único tema (~15 min, 20 decisões)</b>
+          {step === 1 && packs.length > 1 && <PackSelect packs={packs} value={pack} onChange={setPack} />}
           {step === 1 && (
             <div className="row">
-              <select value={theme} onChange={(e) => setTheme(e.target.value)}>
+              <select value={theme} onChange={(e) => setTheme(e.target.value)} aria-label="Tema">
                 {themes.map((t) => (
                   <option key={t.theme} value={t.theme}>
                     {t.label}

@@ -6,6 +6,8 @@ export type Mode = "representative" | "hard" | "review";
 export interface SessionInfo {
   id: number;
   mode: Mode;
+  /** Pack the session draws from (null: every pack). */
+  pack_id: string | null;
   theme: string | null;
   target_count: number;
   done: number;
@@ -27,17 +29,25 @@ export interface ChannelInfo {
   note: string;
 }
 
+export interface PackInfo {
+  pack_id: string;
+  version: string;
+  title: string;
+  /** Short name, e.g. "BTN x BB". */
+  name: string;
+  description: string;
+  exercises: number;
+  boards: number;
+  license: string;
+  provenance: string;
+}
+
 export interface AppInfo {
   version: string;
   data_dir: string;
   db_path: string;
   db_schema: number;
-  pack_id: string;
-  pack_version: string;
-  pack_title: string;
-  pack_exercises: number;
-  pack_license: string;
-  pack_provenance: string;
+  packs: PackInfo[];
   engine_rev: string;
   review_due: number;
   open_session: SessionInfo | null;
@@ -76,6 +86,8 @@ export interface Presented {
   preflop_line: string;
   line: string[];
   actions: ActionOption[];
+  pack_id: string;
+  pack_name: string;
   pack_version: string;
   review_note: string | null;
 }
@@ -166,6 +178,7 @@ export interface ProgressFilter {
   theme?: string;
   mode?: string;
   since?: string;
+  pack_id?: string;
   pack_version?: string;
   group_by?: string;
 }
@@ -212,6 +225,7 @@ export interface StudyView {
 }
 
 export interface StudyEntry {
+  pack_id: string;
   exercise_id: string;
   theme_label: string;
   board: string;
@@ -221,6 +235,10 @@ export interface StudyEntry {
 }
 
 export interface BoardOption {
+  pack_id: string;
+  pack_name: string;
+  oop_position: string;
+  ip_position: string;
   solution_id: string;
   board: string;
   textures: string[];
@@ -411,10 +429,10 @@ export type DownloadEvent =
 
 export const api = {
   appInfo: () => invoke<AppInfo>("app_info"),
-  listThemes: () => invoke<ThemeInfo[]>("list_themes"),
-  listStudyEntries: () => invoke<StudyEntry[]>("list_study_entries"),
-  startSession: (mode: Mode, theme: string | null, count: number) =>
-    invoke<SessionInfo>("start_session", { mode, theme, count }),
+  listThemes: (packId: string | null) => invoke<ThemeInfo[]>("list_themes", { packId }),
+  listStudyEntries: (packId: string | null) => invoke<StudyEntry[]>("list_study_entries", { packId }),
+  startSession: (mode: Mode, packId: string | null, theme: string | null, count: number) =>
+    invoke<SessionInfo>("start_session", { mode, packId, theme, count }),
   nextExercise: (sessionId: number) => invoke<Presented | null>("next_exercise", { sessionId }),
   submitAnswer: (token: string, action: number, decisionMs: number) =>
     invoke<FeedbackView>("submit_answer", { token, action, decisionMs }),

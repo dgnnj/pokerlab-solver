@@ -35,8 +35,9 @@ jobs:
       - name: Tag matches Cargo.toml, package.json and tauri.conf.json
         run: node scripts/check-version.mjs --tag "${{ github.ref_name }}"
       - run: cargo test --workspace
-      - name: Bundled pack integrity
-        run: cargo run --release -p pokerlab-cli -- verify-pack src-tauri/resources/packs/btn-vs-bb-srp-100bb
+      - name: Bundled packs integrity
+        shell: bash
+        run: for p in src-tauri/resources/packs/*/; do cargo run --release -p pokerlab-cli -- verify-pack "$p" || exit 1; done
       - name: Production update channel
         shell: bash
         env:

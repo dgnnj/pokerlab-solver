@@ -4,6 +4,7 @@ import type { Nav, Screen } from "../App";
 import { CardRow } from "../components/Cards";
 import { ActionLegend, RangeGrid } from "../components/RangeGrid";
 import { bb, formatLine, freq, pct, STREET_LABEL } from "../format";
+import { PackSelect, usePreferredPack } from "../components/PackSelect";
 
 export function Study({
   nav,
@@ -16,7 +17,9 @@ export function Study({
   highlight: string | null;
   back?: Screen;
 }) {
-  const [entries, setEntries] = useState<StudyEntry[]>([]);
+  const packs = nav.info?.packs ?? [];
+  const [preferred, setPreferred, prefLoaded] = usePreferredPack(nav.info?.packs, false);
+  const [all, setAll] = useState<StudyEntry[]>([]);
   const [current, setCurrent] = useState<string | undefined>(exerciseId);
   const [view, setView] = useState<StudyView | null>(null);
   const [hand, setHand] = useState<string | null>(null);
@@ -25,14 +28,18 @@ export function Study({
 
   useEffect(() => {
     void api
-      .listStudyEntries()
-      .then((e) => {
-        setEntries(e);
-        if (!current && e.length) setCurrent(e[0].exercise_id);
-      })
+      .listStudyEntries(null)
+      .then(setAll)
       .catch((e) => setErr(errorText(e)));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // The pack is the one of the open point (coming from a drill), else the preferred one.
+  const currentPack = all.find((e) => e.exercise_id === current)?.pack_id;
+  const pack = currentPack ?? preferred;
+  const entries = useMemo(() => all.filter((e) => e.pack_id === pack), [all, pack]);
+  useEffect(() => {
+    if (prefLoaded && !currentPack && entries.length) setCurrent(entries[0].exercise_id);
+  }, [prefLoaded, currentPack, entries]);
 
   useEffect(() => {
     if (!current) return;
@@ -63,6 +70,18 @@ export function Study({
       </header>
       {err && <div className="alert alert-error">{err}</div>}
       <div className="row wrap">
+        {packs.length > 1 && (
+          <PackSelect
+            packs={packs}
+            value={pack}
+            onChange={(id) => {
+              setPreferred(id);
+              setStreet("");
+              const first = all.find((e) => e.pack_id === id);
+              if (first) setCurrent(first.exercise_id);
+            }}
+          />
+        )}
         <label>
           Board
           <select

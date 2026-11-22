@@ -549,6 +549,21 @@ export function Hand({ nav }: { nav: Nav }) {
 
   const ready = status?.state === "ready";
   const readyBoard = ready ? status.board : null;
+  const readySolution = ready ? status.solution_id : null;
+  const sel = boards.find((b) => b.solution_id === solutionId);
+  const packs = Array.from(new Map(boards.map((b) => [b.pack_id, b.pack_name])).entries());
+  const packBoards = boards.filter((b) => b.pack_id === sel?.pack_id);
+  // Positions come from the spot of the board that will be played (the ready one, else the selected).
+  const playing = boards.find((b) => b.solution_id === readySolution) ?? sel;
+  const heroOptions: [string, string][] = playing
+    ? [
+        ["random", "Aleatória"],
+        [playing.oop_position, `${playing.oop_position} (fora de posição)`],
+        [playing.ip_position, `${playing.ip_position} (em posição)`],
+      ]
+    : [["random", "Aleatória"]];
+  const heroValue = heroOptions.some(([v]) => v === hero) ? hero : "random";
+  memo.hero = heroValue;
 
   // ---------- Past hand ----------
   if (review && !hand) {
@@ -633,13 +648,33 @@ export function Hand({ nav }: { nav: Nav }) {
       </p>
       {err && <div className="alert alert-error">{err}</div>}
       <div className="form">
+        {packs.length > 1 && (
+          <label>
+            Spot
+            <select
+              aria-label="Spot"
+              value={sel?.pack_id ?? ""}
+              onChange={(e) => {
+                const first = boards.find((b) => b.pack_id === e.target.value);
+                if (first) setSolutionId(first.solution_id);
+              }}
+            >
+              {packs.map(([id, name]) => (
+                <option key={id} value={id}>
+                  {name}
+                  {boards.some((b) => b.pack_id === id && b.solution_id === readySolution) ? " — pronto" : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label>
           Board (flop)
           <select value={solutionId} onChange={(e) => setSolutionId(e.target.value)}>
-            {boards.map((b) => (
+            {packBoards.map((b) => (
               <option key={b.solution_id} value={b.solution_id}>
                 {b.board}
-                {readyBoard === b.board ? " — pronto" : ""}
+                {readySolution === b.solution_id ? " — pronto" : ""}
               </option>
             ))}
           </select>
@@ -650,7 +685,7 @@ export function Hand({ nav }: { nav: Nav }) {
           )}
           <button
             onClick={() => {
-              const others = boards.filter((b) => b.solution_id !== solutionId);
+              const others = packBoards.filter((b) => b.solution_id !== solutionId);
               if (others.length) setSolutionId(others[Math.floor(Math.random() * others.length)].solution_id);
             }}
           >
@@ -659,13 +694,9 @@ export function Hand({ nav }: { nav: Nav }) {
         </div>
         <fieldset>
           <legend>Sua posição</legend>
-          {[
-            ["random", "Aleatória"],
-            ["BB", "BB (fora de posição)"],
-            ["BTN", "BTN (em posição)"],
-          ].map(([v, l]) => (
+          {heroOptions.map(([v, l]) => (
             <label key={v} className="radio">
-              <input type="radio" name="hero" checked={hero === v} onChange={() => setHero(v)} /> {l}
+              <input type="radio" name="hero" checked={heroValue === v} onChange={() => setHero(v)} /> {l}
             </label>
           ))}
         </fieldset>
@@ -686,6 +717,7 @@ export function Hand({ nav }: { nav: Nav }) {
       {ready && (
         <button className="primary big" onClick={() => void newHand()} disabled={busy}>
           Jogar mão no board {readyBoard}
+          {packs.length > 1 && playing ? ` (${playing.pack_name})` : ""}
         </button>
       )}
       <p className="muted small">
