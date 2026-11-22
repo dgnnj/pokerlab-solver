@@ -1,6 +1,6 @@
 # Changelog
 
-## Não lançado
+## 0.3.3 — 2026-11-22
 - Erros das mãos completas na revisão espaçada: uma decisão com nota Imprecisão ou Erro entra na fila de "Revisar erros". Se o ponto da árvore é um exercício do pacote, a revisão repete a mesma situação com a mesma mão; senão, traz outra situação do mesmo tema. Quando o pacote não tem exercícios daquele tipo de decisão (por exemplo, o BB liderando no flop), a decisão não entra na fila e a mão avisa. Cada decisão diz o que aconteceu, e o fim da mão mostra quantas foram para a revisão.
 - Tema de cada decisão da mão (mesma classificação dos exercícios do pacote) gravado e exportado no CSV das mãos (coluna `theme`).
 - Banco schema v4 (migração com backup automático): item de revisão vem de um exercício ou de uma decisão de mão.
