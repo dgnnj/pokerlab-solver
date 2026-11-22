@@ -7,7 +7,7 @@
 # Rake: sem rake nesta versão (referência). Ajustar `rake` quando a estrutura da sala for identificada.
 
 id = "btn_bb_srp100"
-version = 1
+version = 2
 title = "BTN x BB, pote simples, 100 bb"
 oop_position = "BB"
 ip_position = "BTN"
@@ -39,9 +39,9 @@ river_donk = ""
 add_allin_threshold = 1.5
 force_allin_threshold = 0.15
 merging_threshold = 0.1
-# BB não lidera no flop nesta versão (só check / check-raise).
+# BB pode liderar 33% no flop (desde a v2 do spot, pacote 1.2.0).
 [tree.oop.flop]
-bet = ""
+bet = "33%"
 raise = "3x"
 [tree.ip.flop]
 bet = "33%, 75%"
@@ -60,14 +60,14 @@ bet = "75%"
 raise = "3x"
 
 [oop_range]
-text = "JJ:0.5,TT:0.75,99-22,AQs:0.5,AJs-A6s,A5s:0.5,A4s:0.5,A3s-A2s,KQs:0.5,KJs-K2s,QJs-Q4s,JTs-J7s,T9s-T7s,98s-96s,87s-85s,76s-75s,65s-64s,54s-53s,43s,AQo:0.75,AJo-A8o,A7o-A2o:0.5,KQo,KJo-KTo,K9o:0.5,QJo-QTo,Q9o:0.5,JTo,J9o:0.5,T9o:0.5,98o:0.3"
-source = "PokerLab — range de defesa do BB contra abertura 2,5 bb do BTN (sem os 3-bets), revisão 2026-11-20"
+text = "JJ-TT:0.5,99-22,AQs:0.25,AJs:0.5,ATs:0.75,A9s-A6s,A3s-A2s:0.25,KQs-KJs:0.5,KTs:0.75,K9s-K6s:0.5,K5s-K2s:0.75,QJs:0.75,QTs,Q9s:0.5,Q8s:0.75,Q7s-Q4s,JTs:0.75,J9s:0.5,J8s-J7s,T9s:0.75,T8s:0.5,T7s,98s:0.75,97s:0.5,96s,87s,86s:0.5,85s,76s:0.75,75s:0.5,65s:0.75,64s:0.5,54s:0.75,53s,43s,AQo:0.5,AJo:0.75,ATo,A9o-A8o:0.75,A7o-A2o:0.5,KQo:0.5,KJo:0.75,KTo,K9o:0.5,QJo:0.75,QTo,Q9o:0.5,JTo,J9o:0.5,T9o:0.5,98o:0.3"
+source = "PokerLab — range de defesa do BB contra abertura 2,5 bb do BTN (sem os 3-bets), revisão 2026-11-22"
 manual_premise = true
-notes = "Premissa de estudo construída manualmente; não derivada de solução pré-flop. Pesos parciais representam mãos divididas entre call e 3-bet."
+notes = "Premissa de estudo construída manualmente; não derivada de solução pré-flop. Pesos parciais representam mãos divididas entre call e 3-bet; o 3-bet é o range do pacote BB x BTN pote 3-bet (call + 3-bet <= 1 em cada mão)."
 
 [ip_range]
 text = "22+,A2s+,K2s+,Q4s+,J6s+,T6s+,96s+,85s+,75s+,64s+,54s,A5o+,K9o+,Q9o+,J9o+,T9o"
-source = "PokerLab — range de abertura do BTN (~43%), revisão 2026-11-20"
+source = "PokerLab — range de abertura do BTN (~38%), revisão 2026-11-20"
 manual_premise = true
 notes = "Premissa de estudo construída manualmente; não derivada de solução pré-flop."
 

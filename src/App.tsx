@@ -89,7 +89,8 @@ export default function App() {
           </button>
         ))}
         <div className="sidebar-foot muted">
-          v{info?.version ?? "?"} · pacote {info?.pack_version ?? "?"}
+          v{info?.version ?? "?"} ·{" "}
+          {info && info.packs.length === 1 ? `pacote ${info.packs[0].version}` : `${info?.packs.length ?? "?"} pacotes`}
         </div>
       </nav>
       <main className="content">

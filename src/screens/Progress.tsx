@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, errorText, ProgressFilter, ProgressReport, ThemeInfo } from "../api";
+import { api, errorText, PackInfo, ProgressFilter, ProgressReport, ThemeInfo } from "../api";
 import { bb, GRADE_LABEL, MODE_LABEL, pct, shortDate } from "../format";
 
 const PERIODS: { label: string; days: number | null }[] = [
@@ -13,11 +13,26 @@ export function Progress() {
   const [period, setPeriod] = useState<number | null>(null);
   const [report, setReport] = useState<ProgressReport | null>(null);
   const [themes, setThemes] = useState<ThemeInfo[]>([]);
+  const [packs, setPacks] = useState<PackInfo[]>([]);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    void api.listThemes().then(setThemes).catch(() => undefined);
+    void api
+      .appInfo()
+      .then((i) => setPacks(i.packs))
+      .catch(() => undefined);
   }, []);
+  // Theme keys repeat across packs: the theme filter only applies inside one pack.
+  useEffect(() => {
+    if (!filter.pack_id) {
+      setThemes([]);
+      return;
+    }
+    void api
+      .listThemes(filter.pack_id)
+      .then(setThemes)
+      .catch(() => undefined);
+  }, [filter.pack_id]);
 
   useEffect(() => {
     const since = period ? new Date(Date.now() - period * 86400000).toISOString().slice(0, 19) + "Z" : undefined;
@@ -112,9 +127,30 @@ export function Progress() {
             ))}
           </select>
         </label>
+        {packs.length > 1 && (
+          <label>
+            Spot
+            <select
+              value={filter.pack_id ?? ""}
+              onChange={(e) => setFilter({ ...filter, pack_id: e.target.value || undefined, theme: undefined })}
+            >
+              <option value="">Todos</option>
+              {packs.map((p) => (
+                <option key={p.pack_id} value={p.pack_id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label>
           Exercício
-          <select value={filter.theme ?? ""} onChange={set("theme")}>
+          <select
+            value={filter.theme ?? ""}
+            onChange={set("theme")}
+            disabled={packs.length > 1 && !filter.pack_id}
+            title={packs.length > 1 && !filter.pack_id ? "Escolha um spot para filtrar por exercício" : undefined}
+          >
             <option value="">Todos</option>
             {themes.map((t) => (
               <option key={t.theme} value={t.theme}>

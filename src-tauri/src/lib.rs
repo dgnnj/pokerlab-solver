@@ -16,7 +16,13 @@ use trainer::{
     StudyEntry, StudyView, ThemeInfo, Trainer, TrainerError,
 };
 
-pub const BUNDLED_PACK: &str = "btn-vs-bb-srp-100bb";
+/// Bundled packs, in display order. Any other pack folder in `resources/packs` comes after these.
+pub const BUNDLED_PACKS: &[&str] = &[
+    "btn-vs-bb-srp-100bb",
+    "co-vs-bb-srp-100bb",
+    "sb-vs-bb-srp-100bb",
+    "bb-vs-btn-3bp-100bb",
+];
 
 pub struct AppState {
     pub trainer: Mutex<Option<Trainer>>,
@@ -64,18 +70,26 @@ struct AppInfo {
     data_dir: String,
     db_path: String,
     db_schema: i64,
-    pack_id: String,
-    pack_version: String,
-    pack_title: String,
-    pack_exercises: usize,
-    pack_license: String,
-    pack_provenance: String,
+    packs: Vec<PackSummary>,
     engine_rev: String,
     review_due: i64,
     open_session: Option<SessionInfo>,
     health: HealthInfo,
     startup_error: Option<String>,
     update_channel: updater::ChannelInfo,
+}
+
+#[derive(Serialize)]
+struct PackSummary {
+    pack_id: String,
+    version: String,
+    title: String,
+    name: String,
+    description: String,
+    exercises: usize,
+    boards: usize,
+    license: String,
+    provenance: String,
 }
 
 #[tauri::command]
@@ -93,12 +107,7 @@ fn app_info(app: tauri::AppHandle, state: State<AppState>) -> CmdResult<AppInfo>
         data_dir: state.data_dir.display().to_string(),
         db_path: String::new(),
         db_schema: 0,
-        pack_id: String::new(),
-        pack_version: String::new(),
-        pack_title: String::new(),
-        pack_exercises: 0,
-        pack_license: String::new(),
-        pack_provenance: String::new(),
+        packs: Vec::new(),
         engine_rev: String::new(),
         review_due: 0,
         open_session: None,
@@ -107,17 +116,32 @@ fn app_info(app: tauri::AppHandle, state: State<AppState>) -> CmdResult<AppInfo>
         update_channel: channel,
     };
     let Some(t) = g.as_ref() else { return Ok(base) };
-    let m = &t.pack.manifest;
+    let packs = t
+        .packs
+        .list
+        .iter()
+        .map(|p| PackSummary {
+            pack_id: p.manifest.pack_id.clone(),
+            version: p.manifest.version.clone(),
+            title: p.manifest.title.clone(),
+            name: p.short_name(),
+            description: p.manifest.description.clone(),
+            exercises: p.manifest.exercises.len(),
+            boards: p.solutions.len(),
+            license: p.manifest.license.clone(),
+            provenance: p.manifest.provenance.clone(),
+        })
+        .collect();
     Ok(AppInfo {
         db_path: t.db.path.display().to_string(),
         db_schema: t.db.schema_version()?,
-        pack_id: m.pack_id.clone(),
-        pack_version: m.version.clone(),
-        pack_title: m.title.clone(),
-        pack_exercises: m.exercises.len(),
-        pack_license: m.license.clone(),
-        pack_provenance: m.provenance.clone(),
-        engine_rev: m.engine.git_rev.clone(),
+        engine_rev: t
+            .packs
+            .list
+            .first()
+            .map(|p| p.manifest.engine.git_rev.clone())
+            .unwrap_or_default(),
+        packs,
         review_due: t.review_due_count()?,
         open_session: t.last_open_session()?,
         ..base
@@ -125,23 +149,27 @@ fn app_info(app: tauri::AppHandle, state: State<AppState>) -> CmdResult<AppInfo>
 }
 
 #[tauri::command]
-fn list_themes(state: State<AppState>) -> CmdResult<Vec<ThemeInfo>> {
-    with_trainer(&state, |t| Ok(t.themes()))
+fn list_themes(state: State<AppState>, pack_id: Option<String>) -> CmdResult<Vec<ThemeInfo>> {
+    with_trainer(&state, |t| Ok(t.themes(pack_id.as_deref())))
 }
 
 #[tauri::command]
-fn list_study_entries(state: State<AppState>) -> CmdResult<Vec<StudyEntry>> {
-    with_trainer(&state, |t| Ok(t.study_entries()))
+fn list_study_entries(
+    state: State<AppState>,
+    pack_id: Option<String>,
+) -> CmdResult<Vec<StudyEntry>> {
+    with_trainer(&state, |t| Ok(t.study_entries(pack_id.as_deref())))
 }
 
 #[tauri::command]
 fn start_session(
     state: State<AppState>,
     mode: Mode,
+    pack_id: Option<String>,
     theme: Option<String>,
     count: i64,
 ) -> CmdResult<SessionInfo> {
-    with_trainer(&state, |t| t.start_session(mode, theme, count))
+    with_trainer(&state, |t| t.start_session(mode, pack_id, theme, count))
 }
 
 #[tauri::command]
@@ -231,6 +259,7 @@ fn set_pref(state: State<AppState>, key: String, value: String) -> CmdResult<()>
         "auto_update",
         "update_postponed_until",
         "preferred_count",
+        "preferred_pack",
         "show_pct_pot",
     ];
     if !ALLOWED.contains(&key.as_str()) {
@@ -243,6 +272,10 @@ fn set_pref(state: State<AppState>, key: String, value: String) -> CmdResult<()>
 
 #[derive(Serialize)]
 struct BoardOption {
+    pack_id: String,
+    pack_name: String,
+    oop_position: String,
+    ip_position: String,
     solution_id: String,
     board: String,
     textures: Vec<String>,
@@ -254,41 +287,52 @@ struct BoardOption {
 #[tauri::command]
 fn hand_boards(state: State<AppState>) -> CmdResult<Vec<BoardOption>> {
     with_trainer(&state, |t| {
-        let mut v: Vec<BoardOption> = t
-            .pack
-            .solutions
-            .values()
-            .map(|s| BoardOption {
-                solution_id: s.solution_id.clone(),
-                board: s.spot.board.clone(),
-                textures: poker_core::cards::parse_board(&s.spot.board)
-                    .map(|b| poker_core::texture::flop_texture_tags(&b))
-                    .unwrap_or_default(),
-                pack_exploitability_pct: s.solve.final_exploitability_pct_pot,
-                pack_solve_ms: s.solve.solve_ms,
-                memory_mib: s.solve.memory_estimate_bytes >> 20,
+        let mut v: Vec<(usize, BoardOption)> = t
+            .packs
+            .list
+            .iter()
+            .enumerate()
+            .flat_map(|(i, p)| p.solutions.values().map(move |s| (i, p, s)))
+            .map(|(i, p, s)| {
+                (
+                    i,
+                    BoardOption {
+                        pack_id: p.manifest.pack_id.clone(),
+                        pack_name: p.short_name(),
+                        oop_position: s.spot.oop_position.clone(),
+                        ip_position: s.spot.ip_position.clone(),
+                        solution_id: s.solution_id.clone(),
+                        board: s.spot.board.clone(),
+                        textures: poker_core::cards::parse_board(&s.spot.board)
+                            .map(|b| poker_core::texture::flop_texture_tags(&b))
+                            .unwrap_or_default(),
+                        pack_exploitability_pct: s.solve.final_exploitability_pct_pot,
+                        pack_solve_ms: s.solve.solve_ms,
+                        memory_mib: s.solve.memory_estimate_bytes >> 20,
+                    },
+                )
             })
             .collect();
-        v.sort_by(|a, b| a.board.cmp(&b.board));
-        Ok(v)
+        v.sort_by(|a, b| (a.0, &a.1.board).cmp(&(b.0, &b.1.board)));
+        Ok(v.into_iter().map(|(_, b)| b).collect())
     })
 }
 
 #[tauri::command]
 fn hand_prepare(state: State<AppState>, solution_id: String) -> CmdResult<handplay::EngineStatus> {
     let src = with_trainer(&state, |t| {
-        let s = t
-            .pack
-            .solutions
-            .get(&solution_id)
+        let p = t
+            .packs
+            .of_solution(&solution_id)
             .ok_or_else(|| TrainerError::Msg(format!("solução desconhecida: {solution_id}")))?;
+        let s = &p.solutions[&solution_id];
         Ok(handplay::BoardSource {
             solution_id: s.solution_id.clone(),
             spot: s.spot.clone(),
             pack_config_hash: s.config_hash.clone(),
             pack_exploitability_pct: s.solve.final_exploitability_pct_pot,
-            pack_id: t.pack.manifest.pack_id.clone(),
-            pack_version: t.pack.manifest.version.clone(),
+            pack_id: p.manifest.pack_id.clone(),
+            pack_version: p.manifest.version.clone(),
         })
     })?;
     state.hands.prepare(src)
@@ -340,10 +384,7 @@ fn hand_history(state: State<AppState>, limit: Option<i64>) -> CmdResult<handpla
 fn hand_review(state: State<AppState>, id: i64) -> CmdResult<handplay::HandReview> {
     with_trainer(&state, |t| {
         handplay::review(&t.db, id, |sid| {
-            t.pack
-                .solutions
-                .get(sid)
-                .map(|s| s.spot.chips_per_bb as f64)
+            t.packs.solution(sid).map(|s| s.spot.chips_per_bb as f64)
         })
     })
 }
@@ -385,20 +426,19 @@ fn init_trainer(
     let resource_dir = app.path().resource_dir().map_err(|e| e.to_string())?;
     let bundled = std::env::var_os("POKERLAB_PACK_DIR")
         .map(PathBuf::from)
-        .unwrap_or_else(|| {
-            resource_dir
-                .join("resources")
-                .join("packs")
-                .join(BUNDLED_PACK)
-        });
-    let pack = trainer::install_pack(&db, &bundled, &data_dir.join("packs"))
-        .map_err(|e| format!("pacote inicial: {e}"))?;
-    health.checks.push(format!(
-        "pacote {} v{} íntegro ({} exercícios, SHA-256 verificado)",
-        pack.manifest.pack_id,
-        pack.manifest.version,
-        pack.manifest.exercises.len()
-    ));
+        .unwrap_or_else(|| resource_dir.join("resources").join("packs"));
+    let mut packs = Vec::new();
+    for dir in bundled_pack_dirs(&bundled)? {
+        let pack = trainer::install_pack(&db, &dir, &data_dir.join("packs"))
+            .map_err(|e| format!("pacote {}: {e}", dir.display()))?;
+        health.checks.push(format!(
+            "pacote {} v{} íntegro ({} exercícios, SHA-256 verificado)",
+            pack.manifest.pack_id,
+            pack.manifest.version,
+            pack.manifest.exercises.len()
+        ));
+        packs.push(pack);
+    }
     db.set_pref("running_version", &version)
         .map_err(|e| e.to_string())?;
     if db
@@ -415,7 +455,35 @@ fn init_trainer(
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_nanos() as u64)
         .unwrap_or(7);
-    Ok((Trainer::new(db, pack, seed), health))
+    Ok((Trainer::new(db, packs, seed), health))
+}
+
+/// Pack folders to install: `dir` itself when it is a pack (has `manifest.json`), else its
+/// subfolders that are packs, the known ones first in `BUNDLED_PACKS` order.
+pub fn bundled_pack_dirs(dir: &std::path::Path) -> Result<Vec<PathBuf>, String> {
+    if dir.join("manifest.json").is_file() {
+        return Ok(vec![dir.to_path_buf()]);
+    }
+    let mut v: Vec<PathBuf> = std::fs::read_dir(dir)
+        .map_err(|e| format!("pacotes em {}: {e}", dir.display()))?
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| p.join("manifest.json").is_file())
+        .collect();
+    let rank = |p: &PathBuf| {
+        let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
+        (
+            BUNDLED_PACKS
+                .iter()
+                .position(|b| *b == name)
+                .unwrap_or(usize::MAX),
+            name.to_string(),
+        )
+    };
+    v.sort_by_key(rank);
+    if v.is_empty() {
+        return Err(format!("nenhum pacote em {}", dir.display()));
+    }
+    Ok(v)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

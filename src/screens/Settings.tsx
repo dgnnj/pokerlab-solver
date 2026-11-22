@@ -88,11 +88,16 @@ export function Settings({ nav }: { nav: Nav }) {
         </button>
       </div>
       <h2>Sobre</h2>
-      <p>
-        PokerLab v{info?.version} · pacote {info?.pack_title} v{info?.pack_version} ({info?.pack_exercises} exercícios)
-      </p>
-      <p className="muted small">{info?.pack_provenance}</p>
-      <p className="muted small">{info?.pack_license}</p>
+      <p>PokerLab v{info?.version}</p>
+      {info?.packs.map((p) => (
+        <div key={p.pack_id} className="pack-about">
+          <p>
+            Pacote {p.title} v{p.version} ({p.boards} flops, {p.exercises} exercícios)
+          </p>
+          <p className="muted small">{p.provenance}</p>
+          <p className="muted small">{p.license}</p>
+        </div>
+      ))}
       <p className="muted small">
         Motor: postflop-solver @ {info?.engine_rev} (AGPL-3.0-or-later). Este programa é software livre sob AGPL-3.0-or-later; o
         código-fonte correspondente acompanha cada release. Uso para prática simulada e revisão pós-sessão.

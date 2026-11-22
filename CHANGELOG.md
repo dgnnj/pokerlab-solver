@@ -1,5 +1,13 @@
 # Changelog
 
+## Não lançado
+- Três spots novos, cada um com 12 flops (flop, turn e river): CO x BB pote simples, SB x BB pote simples (blind contra blind) e BB x BTN pote 3-bet (SPR ~4). Ranges são premissas de estudo, documentadas em `data/spots/`.
+- BTN x BB 1.2.0: o BB pode liderar 33% no flop (exercícios "BB no flop: liderar ou passar"; na mão completa, essas decisões agora entram na revisão). A defesa por call do BB passou a fechar com o 3-bet do pacote novo (call + 3-bet ≤ 1 em cada mão). A árvore ficou maior: resolver um flop desse spot na mão completa leva de 30 s a ~4 min e até ~6 GB.
+- Seletor "Spot" em Treinar, Sessão de estudo, Estudar, Mão completa e Progresso; o app lembra o último spot escolhido. A posição na mão completa vem do spot (SB, CO, BTN ou BB).
+- Temas do agressor fora de posição (SB x BB e pote 3-bet): "c-bet ou passar" no flop e "apostar ou passar" depois, em vez de "liderar".
+- Revisão espaçada e progresso por tema ficam dentro do spot, já que os mesmos temas existem em mais de um spot. Erros de versões antigas do BTN x BB continuam na fila e voltam como outra situação do mesmo tema no BTN x BB.
+- O instalador passa a incluir os 4 pacotes (~62 MB de soluções comprimidas, antes ~16 MB).
+
 ## 0.3.3 — 2026-11-22
 - Erros das mãos completas na revisão espaçada: uma decisão com nota Imprecisão ou Erro entra na fila de "Revisar erros". Se o ponto da árvore é um exercício do pacote, a revisão repete a mesma situação com a mesma mão; senão, traz outra situação do mesmo tema. Quando o pacote não tem exercícios daquele tipo de decisão (por exemplo, o BB liderando no flop), a decisão não entra na fila e a mão avisa. Cada decisão diz o que aconteceu, e o fim da mão mostra quantas foram para a revisão.
 - Tema de cada decisão da mão (mesma classificação dos exercícios do pacote) gravado e exportado no CSV das mãos (coluna `theme`).

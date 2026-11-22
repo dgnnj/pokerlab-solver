@@ -1,0 +1,80 @@
+# Template: NLHE cash 6-max, pote 3-bet: BTN abre, BB dá 3-bet, BTN paga. 100 bb.
+# O board é substituído pelo gerador de pacotes (data/packs/bb_vs_btn_3bp_100bb.toml).
+#
+# Contabilidade (fichas; 100 fichas = 1 bb), blinds 0,5/1 bb sem ante:
+#   BTN abre para 2,5 bb, SB desiste (0,5 bb morto), BB dá 3-bet para 11 bb, BTN paga 8,5 bb a mais.
+#   Pote no flop = 11 + 11 + 0,5 = 22,5 bb (2250 fichas). Stack efetivo = 100 - 11 = 89 bb (8900 fichas).
+#   SPR ~4. O BB é o agressor pré-flop e joga fora de posição.
+# Rake: sem rake nesta versão (referência).
+
+id = "bb_btn_3bp100"
+version = 1
+title = "BB x BTN, pote 3-bet, 100 bb"
+oop_position = "BB"
+ip_position = "BTN"
+pot_type = "3BP"
+preflop_aggressor = "BB"
+initial_street = "flop"
+board = "Ks7d4c"
+chips_per_bb = 100
+starting_pot_chips = 2250
+effective_stack_chips = 8900
+
+[preflop]
+starting_stack_chips = 10000
+line = "BTN abre para 2,5 bb, SB desiste, BB dá 3-bet para 11 bb, BTN paga"
+invested_per_player_chips = 1100
+dead_chips = 50
+[preflop.blinds]
+sb_chips = 50
+bb_chips = 100
+ante_chips = 0
+
+[rake]
+rate = 0.0
+cap_chips = 0.0
+structure = "sem rake (referência; estrutura de sala ainda não definida)"
+
+# SPR baixo: c-bet pequeno (25% ou 50%); depois do check o BTN aposta 50%. All-in entra
+# como opção quando a aposta passa de 1,5x o pote restante (add_allin_threshold).
+[tree]
+turn_donk = ""
+river_donk = ""
+add_allin_threshold = 1.5
+force_allin_threshold = 0.15
+merging_threshold = 0.1
+[tree.oop.flop]
+bet = "25%, 50%"
+raise = "3x"
+[tree.ip.flop]
+bet = "50%"
+raise = "3x"
+[tree.oop.turn]
+bet = "75%"
+raise = "3x"
+[tree.ip.turn]
+bet = "75%"
+raise = "3x"
+[tree.oop.river]
+bet = "75%"
+raise = "3x"
+[tree.ip.river]
+bet = "75%"
+raise = "3x"
+
+[oop_range]
+text = "AA-QQ,JJ-TT:0.5,AKs,AQs:0.75,AJs:0.5,ATs:0.25,A5s-A4s,A3s-A2s:0.75,KQs-KJs:0.5,KTs:0.25,K9s-K6s:0.5,K5s-K2s:0.25,QJs:0.25,Q9s:0.5,Q8s:0.25,JTs:0.25,J9s:0.5,T9s:0.25,T8s:0.5,98s:0.25,97s:0.5,86s:0.5,76s:0.25,75s:0.5,65s:0.25,64s:0.5,54s:0.25,AKo,AQo:0.5,AJo:0.25,A9o-A8o:0.25,A5o-A4o:0.25,KQo:0.5,KJo:0.25,QJo:0.25"
+source = "PokerLab — range de 3-bet do BB contra abertura 2,5 bb do BTN (~10%), revisão 2026-11-22"
+manual_premise = true
+notes = "Premissa de estudo construída manualmente; não derivada de solução pré-flop. Complementa a defesa por call do pacote BTN x BB 1.2.0: em cada mão, call + 3-bet <= 1."
+
+[ip_range]
+text = "JJ-TT,99:0.75,88-66:0.5,AQs-ATs,A9s-A6s:0.5,A5s-A4s:0.75,KQs-KTs,K9s:0.5,QJs-QTs,Q9s:0.5,JTs,J9s:0.5,T9s,T8s:0.3,98s,87s:0.75,76s:0.75,65s:0.5,AQo-AJo,ATo:0.5,KQo,KJo:0.5"
+source = "PokerLab — range de call do BTN contra 3-bet do BB (sem os 4-bets: QQ+, AK), rascunho 2026-11-22"
+manual_premise = true
+notes = "Premissa de estudo construída manualmente; não derivada de solução pré-flop. Subconjunto do range de abertura do BTN do pacote BTN x BB."
+
+[solve]
+max_iterations = 1000
+target_exploitability_pct = 0.5
+memory_limit_mib = 12288

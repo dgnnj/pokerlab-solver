@@ -147,6 +147,11 @@ pub struct SpotConfig {
     pub oop_position: String,
     pub ip_position: String,
     pub pot_type: String,
+    /// Position that made the last preflop raise. Absent: the IP player (all spots before the
+    /// packs with an out-of-position aggressor). Not serialized when absent, so the config hash
+    /// of older spots does not change.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preflop_aggressor: Option<String>,
     pub initial_street: Street,
     pub board: String,
     pub chips_per_bb: i32,
@@ -206,6 +211,14 @@ impl SpotConfig {
         if self.oop_position == self.ip_position {
             return Err(CoreError::Config("posições OOP e IP iguais".into()));
         }
+        if let Some(a) = &self.preflop_aggressor {
+            if a != &self.oop_position && a != &self.ip_position {
+                return Err(CoreError::Config(format!(
+                    "preflop_aggressor '{a}' não é {} nem {}",
+                    self.oop_position, self.ip_position
+                )));
+            }
+        }
         if let Some(p) = &self.preflop {
             // `dead_chips` includes folded blinds and all antes.
             let pot = 2 * p.invested_per_player_chips + p.dead_chips;
@@ -227,6 +240,13 @@ impl SpotConfig {
             }
         }
         Ok(())
+    }
+
+    /// Position of the preflop aggressor (the IP player unless `preflop_aggressor` says otherwise).
+    pub fn aggressor(&self) -> &str {
+        self.preflop_aggressor
+            .as_deref()
+            .unwrap_or(&self.ip_position)
     }
 
     pub fn chips_to_bb(&self, chips: f64) -> f64 {
@@ -251,7 +271,7 @@ impl SpotConfig {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     pub(crate) fn sample_toml() -> &'static str {

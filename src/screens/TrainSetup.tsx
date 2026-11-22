@@ -2,8 +2,11 @@ import { useEffect, useState } from "react";
 import { api, errorText, Mode, ThemeInfo } from "../api";
 import type { Nav } from "../App";
 import { MODE_LABEL } from "../format";
+import { PackSelect, usePreferredPack } from "../components/PackSelect";
 
 export function TrainSetup({ nav, mode: initialMode }: { nav: Nav; mode: Mode }) {
+  const packs = nav.info?.packs ?? [];
+  const [pack, setPack] = usePreferredPack(nav.info?.packs, true);
   const [themes, setThemes] = useState<ThemeInfo[]>([]);
   const [theme, setTheme] = useState<string>("");
   const [count, setCount] = useState(20);
@@ -12,13 +15,24 @@ export function TrainSetup({ nav, mode: initialMode }: { nav: Nav; mode: Mode })
 
   useEffect(() => setMode(initialMode), [initialMode]);
   useEffect(() => {
-    void api.listThemes().then(setThemes).catch((e) => setErr(errorText(e)));
     void api.getPref("preferred_count").then((v) => v && setCount(Number(v)));
   }, []);
+  // Theme keys only mean something inside one pack: with every pack, only the street filters.
+  useEffect(() => {
+    setTheme((t) => (t.startsWith("street:") ? t : ""));
+    if (!pack) {
+      setThemes([]);
+      return;
+    }
+    void api
+      .listThemes(pack)
+      .then(setThemes)
+      .catch((e) => setErr(errorText(e)));
+  }, [pack]);
 
   const start = async () => {
     try {
-      const s = await api.startSession(mode, mode === "review" ? null : theme || null, count);
+      const s = await api.startSession(mode, pack || null, mode === "review" ? null : theme || null, count);
       nav.go({ name: "train", sessionId: s.id });
     } catch (e) {
       setErr(errorText(e));
@@ -44,6 +58,9 @@ export function TrainSetup({ nav, mode: initialMode }: { nav: Nav; mode: Mode })
             "Revisão" são para praticar e ficam separadas nas estatísticas.
           </p>
         </fieldset>
+        {mode !== "review" && packs.length > 1 && (
+          <PackSelect packs={packs} value={pack} onChange={setPack} allLabel="Todos os spots" />
+        )}
         {mode !== "review" ? (
           <label>
             Tema

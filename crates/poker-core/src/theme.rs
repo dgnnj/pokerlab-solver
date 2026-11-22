@@ -57,6 +57,14 @@ pub fn classify(
     let (key, what, level) = if to_call_chips == 0 {
         if is_ip {
             ("ip_bet_or_check", "apostar ou passar após check", 1u8)
+        } else if position == spot.aggressor() {
+            // Out-of-position preflop aggressor (3-bet pot, blind vs blind): first to act.
+            let what = if street == Street::Flop {
+                "c-bet ou passar"
+            } else {
+                "apostar ou passar"
+            };
+            ("oop_bet_or_check", what, 1)
         } else {
             ("oop_lead", "liderar ou passar", 1)
         }
@@ -117,5 +125,27 @@ mod tests {
         let (prev, cur) = street_segments(&flop);
         assert!(prev.is_empty());
         assert_eq!(cur, vec!["BB passa"]);
+    }
+
+    #[test]
+    fn out_of_position_aggressor_bets_first() {
+        let mut spot =
+            crate::spot::SpotConfig::from_toml(crate::spot::tests::sample_toml()).unwrap();
+        let oop = spot.oop_position.clone();
+        // IP aggressor (default): OOP first to act leads.
+        let t = classify(Street::Flop, &[], 0, &oop, &spot);
+        assert!(t.key.ends_with("_flop_oop_lead"), "{}", t.key);
+        // OOP aggressor: c-bet on the flop, bet on later streets; IP after a check unchanged.
+        spot.preflop_aggressor = Some(oop.clone());
+        spot.pot_type = "3BP".into();
+        let t = classify(Street::Flop, &[], 0, &oop, &spot);
+        assert_eq!(t.key, "3bp_flop_oop_bet_or_check");
+        assert_eq!(t.label, format!("{oop} no flop: c-bet ou passar"));
+        let line = l(&[&format!("{oop} passa"), "x passa", "Turn: As"]);
+        let t = classify(Street::Turn, &line, 0, &oop, &spot);
+        assert_eq!(t.key, "3bp_turn_after_check_oop_bet_or_check");
+        let ip = spot.ip_position.clone();
+        let t = classify(Street::Flop, &l(&[&format!("{oop} passa")]), 0, &ip, &spot);
+        assert_eq!(t.key, "3bp_flop_ip_bet_or_check");
     }
 }

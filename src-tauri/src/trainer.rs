@@ -57,6 +57,101 @@ impl LoadedPack {
         let s = self.solutions.get(&ex.solution_id)?;
         Some((s, s.node(&ex.node_id)?))
     }
+    /// Short name for lists, e.g. `BB x BTN — pote 3-bet 100 bb` from
+    /// `BB x BTN — pote 3-bet 100 bb (flop, turn e river)`.
+    pub fn short_name(&self) -> String {
+        let t = &self.manifest.title;
+        t.split(" (").next().unwrap_or(t).trim().to_string()
+    }
+}
+
+/// Spot part of a solution id `{spot id}_{board}-v{n}` (e.g. `btn_bb_srp100`).
+fn spot_of_solution(solution_id: &str) -> Option<&str> {
+    let base = solution_id
+        .rsplit_once("-v")
+        .map_or(solution_id, |(s, _)| s);
+    Some(base.rsplit_once('_')?.0)
+}
+
+/// Every installed pack, in bundle order. Exercise ids are `{solution_id}:{node_id}` and
+/// solution ids are unique across packs (they start with the spot id).
+pub struct Packs {
+    pub list: Vec<LoadedPack>,
+    by_solution: HashMap<String, usize>,
+}
+
+impl Packs {
+    pub fn new(list: Vec<LoadedPack>) -> Self {
+        let by_solution = list
+            .iter()
+            .enumerate()
+            .flat_map(|(i, p)| p.solutions.keys().map(move |s| (s.clone(), i)))
+            .collect();
+        Packs { list, by_solution }
+    }
+
+    pub fn get(&self, pack_id: &str) -> Option<&LoadedPack> {
+        self.list.iter().find(|p| p.manifest.pack_id == pack_id)
+    }
+
+    pub fn of_solution(&self, solution_id: &str) -> Option<&LoadedPack> {
+        self.by_solution.get(solution_id).map(|&i| &self.list[i])
+    }
+
+    pub fn solution(&self, solution_id: &str) -> Option<&SolutionFile> {
+        self.of_solution(solution_id)?.solutions.get(solution_id)
+    }
+
+    /// Exercise by id, with the pack that has it.
+    pub fn exercise(&self, id: &str) -> Option<(&LoadedPack, &ExerciseDef)> {
+        let (sid, _) = id.split_once(':')?;
+        let p = self.of_solution(sid)?;
+        Some((p, p.exercise(id)?))
+    }
+
+    /// Pack an exercise id belongs to, even if the exercise is gone (older pack version): the
+    /// pack with that solution, else the pack of the same spot (solution ids are
+    /// `{spot id}_{board}-v{n}`).
+    pub fn home_of(&self, exercise_id: &str) -> Option<&LoadedPack> {
+        let sid = exercise_id.split_once(':').map_or(exercise_id, |(s, _)| s);
+        self.of_solution(sid).or_else(|| {
+            let spot = spot_of_solution(sid)?;
+            self.list.iter().find(|p| {
+                p.solutions
+                    .keys()
+                    .any(|k| spot_of_solution(k) == Some(spot))
+            })
+        })
+    }
+
+    /// Exercises of one pack (or of every pack).
+    pub fn exercises<'a>(
+        &'a self,
+        pack_id: Option<&'a str>,
+    ) -> impl Iterator<Item = &'a ExerciseDef> + 'a {
+        self.list
+            .iter()
+            .filter(move |p| pack_id.is_none_or(|id| p.manifest.pack_id == id))
+            .flat_map(|p| p.manifest.exercises.iter())
+    }
+
+    /// Exercises a review item can fall back to: same theme in the pack of the original
+    /// exercise; in any pack only when that pack is not installed any more.
+    fn review_pool(&self, exercise_id: &str, theme: &str) -> Vec<ExerciseDef> {
+        let home = self
+            .home_of(exercise_id)
+            .map(|p| p.manifest.pack_id.as_str());
+        self.exercises(home)
+            .filter(|e| e.theme == theme)
+            .cloned()
+            .collect()
+    }
+
+    /// Short name of a pack id (the id itself when not installed).
+    pub fn short_name(&self, pack_id: &str) -> String {
+        self.get(pack_id)
+            .map_or_else(|| pack_id.to_string(), LoadedPack::short_name)
+    }
 }
 
 fn copy_dir(src: &Path, dst: &Path) -> std::io::Result<()> {
@@ -197,6 +292,8 @@ pub struct ThemeInfo {
 pub struct SessionInfo {
     pub id: i64,
     pub mode: String,
+    /// Pack the session draws from (None: every pack; review sessions).
+    pub pack_id: Option<String>,
     pub theme: Option<String>,
     pub target_count: i64,
     pub done: i64,
@@ -229,6 +326,8 @@ pub struct Presented {
     pub preflop_line: String,
     pub line: Vec<String>,
     pub actions: Vec<ActionOption>,
+    pub pack_id: String,
+    pub pack_name: String,
     pub pack_version: String,
     pub review_note: Option<String>,
 }
@@ -275,6 +374,7 @@ pub struct ProgressFilter {
     pub theme: Option<String>,
     pub mode: Option<String>,
     pub since: Option<String>,
+    pub pack_id: Option<String>,
     pub pack_version: Option<String>,
     /// theme | street | position | sampling_mode | pack_version | board
     pub group_by: Option<String>,
@@ -328,6 +428,7 @@ pub struct StudyView {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct StudyEntry {
+    pub pack_id: String,
     pub exercise_id: String,
     pub theme_label: String,
     pub board: String,
@@ -346,7 +447,7 @@ pub fn theme_matches(e: &ExerciseDef, filter: &str) -> bool {
 
 pub struct Trainer {
     pub db: Db,
-    pub pack: LoadedPack,
+    pub packs: Packs,
     pub tolerance: Tolerance,
     rng: Rng,
     pending: HashMap<String, Pending>,
@@ -373,10 +474,10 @@ fn grid_hands() -> Vec<String> {
 }
 
 impl Trainer {
-    pub fn new(db: Db, pack: LoadedPack, seed: u64) -> Self {
+    pub fn new(db: Db, packs: Vec<LoadedPack>, seed: u64) -> Self {
         Trainer {
             db,
-            pack,
+            packs: Packs::new(packs),
             tolerance: Tolerance::default(),
             rng: Rng::new(seed),
             pending: HashMap::new(),
@@ -388,9 +489,15 @@ impl Trainer {
         sol.spot.chips_per_bb as f64
     }
 
-    pub fn themes(&self) -> Vec<ThemeInfo> {
+    fn node_of(&self, ex: &ExerciseDef) -> Option<NodeSolution> {
+        let p = self.packs.of_solution(&ex.solution_id)?;
+        p.node(ex).map(|(_, n)| n.clone())
+    }
+
+    /// Themes of one pack (or of every pack, merged by key).
+    pub fn themes(&self, pack_id: Option<&str>) -> Vec<ThemeInfo> {
         let mut map: BTreeMap<String, ThemeInfo> = BTreeMap::new();
-        for e in &self.pack.manifest.exercises {
+        for e in self.packs.exercises(pack_id) {
             let t = map.entry(e.theme.clone()).or_insert(ThemeInfo {
                 theme: e.theme.clone(),
                 label: e.theme_label.clone(),
@@ -404,14 +511,16 @@ impl Trainer {
         v
     }
 
-    pub fn study_entries(&self) -> Vec<StudyEntry> {
-        self.pack
-            .manifest
-            .exercises
+    pub fn study_entries(&self, pack_id: Option<&str>) -> Vec<StudyEntry> {
+        self.packs
+            .list
             .iter()
-            .filter_map(|e| {
-                let (_, n) = self.pack.node(e)?;
+            .filter(|p| pack_id.is_none_or(|id| p.manifest.pack_id == id))
+            .flat_map(|p| p.manifest.exercises.iter().map(move |e| (p, e)))
+            .filter_map(|(p, e)| {
+                let (_, n) = p.node(e)?;
                 Some(StudyEntry {
+                    pack_id: p.manifest.pack_id.clone(),
                     exercise_id: e.id.clone(),
                     theme_label: e.theme_label.clone(),
                     board: e.board.clone(),
@@ -426,12 +535,13 @@ impl Trainer {
     pub fn session(&self, id: i64) -> R<SessionInfo> {
         Ok(self.db.conn.query_row(
             "SELECT s.id, s.mode, s.theme, s.target_count, (SELECT COUNT(*) FROM attempts a WHERE a.session_id = s.id),
-                    s.started_at, s.ended_at FROM sessions s WHERE s.id = ?1",
+                    s.started_at, s.ended_at, s.pack_id FROM sessions s WHERE s.id = ?1",
             [id],
             |r| {
                 Ok(SessionInfo {
                     id: r.get(0)?,
                     mode: r.get(1)?,
+                    pack_id: r.get::<_, String>(7).map(|p| (!p.is_empty()).then_some(p))?,
                     theme: r.get(2)?,
                     target_count: r.get(3)?,
                     done: r.get(4)?,
@@ -468,18 +578,26 @@ impl Trainer {
     pub fn start_session(
         &mut self,
         mode: Mode,
+        pack_id: Option<String>,
         theme: Option<String>,
         count: i64,
     ) -> R<SessionInfo> {
         if !(1..=200).contains(&count) {
             return msg("número de decisões deve estar entre 1 e 200");
         }
+        // Review sessions draw from the whole queue, whatever the pack.
+        let pack_id = pack_id.filter(|p| !p.is_empty() && mode != Mode::Review);
+        let version = match &pack_id {
+            Some(id) => match self.packs.get(id) {
+                Some(p) => p.manifest.version.clone(),
+                None => return msg(format!("pacote desconhecido: {id}")),
+            },
+            None => String::new(),
+        };
         if let Some(t) = &theme {
             if !self
-                .pack
-                .manifest
-                .exercises
-                .iter()
+                .packs
+                .exercises(pack_id.as_deref())
                 .any(|e| theme_matches(e, t))
             {
                 return msg(format!("tema desconhecido: {t}"));
@@ -487,7 +605,7 @@ impl Trainer {
         }
         self.db.conn.execute(
             "INSERT INTO sessions(started_at, mode, theme, target_count, pack_id, pack_version) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            params![now(), mode.as_str(), theme, count, self.pack.manifest.pack_id, self.pack.manifest.version],
+            params![now(), mode.as_str(), theme, count, pack_id.unwrap_or_default(), version],
         )?;
         let id = self.db.conn.last_insert_rowid();
         self.session(id)
@@ -574,21 +692,14 @@ impl Trainer {
     /// How a decision made in a full hand can be reviewed with this pack: the same exercise
     /// with the same hand, another exercise of the same theme, or nothing.
     pub fn review_match(&self, exercise_id: &str, combo: &str, theme: &str) -> ReviewMatch {
-        let exact = self.pack.exercise(exercise_id).is_some_and(|ex| {
+        let exact = self.packs.exercise(exercise_id).is_some_and(|(p, ex)| {
             let c = Combo::parse(combo).ok();
-            self.pack
-                .node(ex)
+            p.node(ex)
                 .is_some_and(|(_, n)| c.is_some_and(|c| n.combo_index(&c).is_some()))
         });
         if exact {
             ReviewMatch::Exact
-        } else if self
-            .pack
-            .manifest
-            .exercises
-            .iter()
-            .any(|e| e.theme == theme)
-        {
+        } else if !self.packs.review_pool(exercise_id, theme).is_empty() {
             ReviewMatch::Theme
         } else {
             ReviewMatch::None
@@ -631,8 +742,8 @@ impl Trainer {
                 "Revisão"
             };
             review_id = Some(rid);
-            let same = self.pack.exercise(&ex_id).cloned().and_then(|ex| {
-                let (_, node) = self.pack.node(&ex)?;
+            let same = self.packs.exercise(&ex_id).and_then(|(p, ex)| {
+                let (_, node) = p.node(ex)?;
                 let c = Combo::parse(&combo_s).ok()?;
                 node.combo_index(&c).map(|_| (ex.clone(), c))
             });
@@ -643,14 +754,7 @@ impl Trainer {
                 }
                 None => {
                     // Same theme, another hand (pack updated or node unavailable).
-                    let pool: Vec<ExerciseDef> = self
-                        .pack
-                        .manifest
-                        .exercises
-                        .iter()
-                        .filter(|e| e.theme == theme)
-                        .cloned()
-                        .collect();
+                    let pool = self.packs.review_pool(&ex_id, &theme);
                     if pool.is_empty() {
                         self.db
                             .conn
@@ -659,9 +763,7 @@ impl Trainer {
                     }
                     let ex = pool[self.rng.below(pool.len())].clone();
                     let node = self
-                        .pack
-                        .node(&ex)
-                        .map(|(_, n)| n.clone())
+                        .node_of(&ex)
                         .ok_or_else(|| TrainerError::Msg("nó ausente".into()))?;
                     let c = self
                         .sample_combo(&node, Mode::Representative)
@@ -672,10 +774,8 @@ impl Trainer {
             }
         } else {
             let pool: Vec<ExerciseDef> = self
-                .pack
-                .manifest
-                .exercises
-                .iter()
+                .packs
+                .exercises(session.pack_id.as_deref())
                 .filter(|e| session.theme.as_ref().is_none_or(|t| theme_matches(e, t)))
                 .cloned()
                 .collect();
@@ -684,17 +784,18 @@ impl Trainer {
             }
             let ex = pool[self.rng.below(pool.len())].clone();
             let node = self
-                .pack
-                .node(&ex)
-                .map(|(_, n)| n.clone())
+                .node_of(&ex)
                 .ok_or_else(|| TrainerError::Msg("nó ausente".into()))?;
             let c = self
                 .sample_combo(&node, mode)
                 .ok_or_else(|| TrainerError::Msg("sem combos elegíveis".into()))?;
             (ex, c)
         };
-        let (sol, node) = self
-            .pack
+        let pack = self
+            .packs
+            .of_solution(&ex.solution_id)
+            .ok_or_else(|| TrainerError::Msg("pacote ausente".into()))?;
+        let (sol, node) = pack
             .node(&ex)
             .ok_or_else(|| TrainerError::Msg("nó ausente".into()))?;
         let cpb = self.cpb(sol);
@@ -744,7 +845,9 @@ impl Trainer {
                     kind: format!("{:?}", a.kind).to_lowercase(),
                 })
                 .collect(),
-            pack_version: self.pack.manifest.version.clone(),
+            pack_id: pack.manifest.pack_id.clone(),
+            pack_name: pack.short_name(),
+            pack_version: pack.manifest.version.clone(),
             review_note,
         };
         self.pending.insert(
@@ -770,13 +873,14 @@ impl Trainer {
         let Some(p) = self.pending.remove(token) else {
             return msg("decisão já registrada ou exercício expirado");
         };
-        let ex = self
-            .pack
+        let (pack, ex) = self
+            .packs
             .exercise(&p.exercise_id)
-            .cloned()
             .ok_or_else(|| TrainerError::Msg("exercício ausente".into()))?;
-        let (sol, node) = self
-            .pack
+        let (pack_id, pack_version) =
+            (pack.manifest.pack_id.clone(), pack.manifest.version.clone());
+        let ex = ex.clone();
+        let (sol, node) = pack
             .node(&ex)
             .ok_or_else(|| TrainerError::Msg("nó ausente".into()))?;
         let fb = match evaluate(
@@ -814,8 +918,8 @@ impl Trainer {
                 ex.id,
                 ex.solution_id,
                 ex.node_id,
-                self.pack.manifest.pack_id,
-                self.pack.manifest.version,
+                pack_id,
+                pack_version,
                 sol.engine.git_rev,
                 fb.combo,
                 fb.chosen_index as i64,
@@ -939,8 +1043,13 @@ impl Trainer {
                 "a.pack_id || ' v' || a.pack_version",
             ),
             "board" => ("a.board", "a.board"),
-            _ => ("a.theme", "MAX(a.theme_label)"),
+            // Theme keys repeat across packs (e.g. `srp_flop_oop_lead` in BTN x BB and CO x BB).
+            _ => ("a.pack_id || '|' || a.theme", "MAX(a.theme_label)"),
         };
+        let theme_group = !matches!(
+            group,
+            "street" | "position" | "sampling_mode" | "pack_version" | "board"
+        );
         let sql = format!(
             "SELECT {key}, {label}, COUNT(*), AVG(a.loss_bb), SUM(a.loss_bb),
                     100.0 * SUM(CASE WHEN a.grade IN ('best','close') THEN 1 ELSE 0 END) / COUNT(*)
@@ -957,7 +1066,15 @@ impl Trainer {
                 best_or_close_pct: r.get(5)?,
             })
         })?;
-        Ok(rows.collect::<Result<_, _>>()?)
+        let mut v: Vec<ThemeStat> = rows.collect::<Result<_, _>>()?;
+        if theme_group && self.packs.list.len() > 1 {
+            for s in &mut v {
+                if let Some((pack_id, _)) = s.key.split_once('|') {
+                    s.label = format!("{} · {}", s.label, self.packs.short_name(pack_id));
+                }
+            }
+        }
+        Ok(v)
     }
 
     pub fn progress(&self, f: &ProgressFilter) -> R<ProgressReport> {
@@ -980,6 +1097,7 @@ impl Trainer {
         add("a.theme", &f.theme, "=");
         add("a.sampling_mode", &f.mode, "=");
         add("a.created_at", &f.since, ">=");
+        add("a.pack_id", &f.pack_id, "=");
         add("a.pack_version", &f.pack_version, "=");
         let where_sql = if conds.is_empty() {
             String::new()
@@ -1022,12 +1140,11 @@ impl Trainer {
     }
 
     pub fn study(&self, exercise_id: &str, highlight: Option<String>) -> R<StudyView> {
-        let ex = self
-            .pack
+        let (pack, ex) = self
+            .packs
             .exercise(exercise_id)
             .ok_or_else(|| TrainerError::Msg("exercício inexistente".into()))?;
-        let (sol, node) = self
-            .pack
+        let (sol, node) = pack
             .node(ex)
             .ok_or_else(|| TrainerError::Msg("nó ausente".into()))?;
         let cpb = self.cpb(sol);
