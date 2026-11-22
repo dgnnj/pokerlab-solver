@@ -1,6 +1,6 @@
 # Changelog
 
-## Não lançado
+## 0.4.0 — 2026-11-22
 - Três spots novos, cada um com 12 flops (flop, turn e river): CO x BB pote simples, SB x BB pote simples (blind contra blind) e BB x BTN pote 3-bet (SPR ~4). Ranges são premissas de estudo, documentadas em `data/spots/`.
 - BTN x BB 1.2.0: o BB pode liderar 33% no flop (exercícios "BB no flop: liderar ou passar"; na mão completa, essas decisões agora entram na revisão). A defesa por call do BB passou a fechar com o 3-bet do pacote novo (call + 3-bet ≤ 1 em cada mão). A árvore ficou maior: resolver um flop desse spot na mão completa leva de 30 s a ~4 min e até ~6 GB.
 - Seletor "Spot" em Treinar, Sessão de estudo, Estudar, Mão completa e Progresso; o app lembra o último spot escolhido. A posição na mão completa vem do spot (SB, CO, BTN ou BB).
