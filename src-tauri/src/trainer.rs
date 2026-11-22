@@ -14,6 +14,7 @@ use rusqlite::{params, OptionalExtension};
 use serde::{Deserialize, Serialize};
 
 use crate::db::{map_attempt, now, unix_now, AttemptRow, Db, DbError, ATTEMPT_COLUMNS};
+use crate::handplay::ReviewMatch;
 
 #[derive(Debug, thiserror::Error)]
 pub enum TrainerError {
@@ -163,6 +164,16 @@ impl Mode {
             _ => Mode::Representative,
         }
     }
+}
+
+/// Next due item of the review queue.
+struct DueReview {
+    id: i64,
+    exercise_id: String,
+    combo: String,
+    theme: String,
+    /// The item comes from a decision in a full hand (not from a training attempt).
+    from_hand: bool,
 }
 
 struct Pending {
@@ -539,16 +550,49 @@ impl Trainer {
         Combo::parse(&node.combos[i]).ok()
     }
 
-    fn due_review(&self) -> R<Option<(i64, String, String, String)>> {
+    fn due_review(&self) -> R<Option<DueReview>> {
         Ok(self
             .db
             .conn
             .query_row(
-                "SELECT id, exercise_id, combo, theme FROM reviews WHERE next_review_at <= ?1 ORDER BY next_review_at, id LIMIT 1",
+                "SELECT id, exercise_id, combo, theme, hand_decision_id IS NOT NULL FROM reviews
+                 WHERE next_review_at <= ?1 ORDER BY next_review_at, id LIMIT 1",
                 [now()],
-                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+                |r| {
+                    Ok(DueReview {
+                        id: r.get(0)?,
+                        exercise_id: r.get(1)?,
+                        combo: r.get(2)?,
+                        theme: r.get(3)?,
+                        from_hand: r.get(4)?,
+                    })
+                },
             )
             .optional()?)
+    }
+
+    /// How a decision made in a full hand can be reviewed with this pack: the same exercise
+    /// with the same hand, another exercise of the same theme, or nothing.
+    pub fn review_match(&self, exercise_id: &str, combo: &str, theme: &str) -> ReviewMatch {
+        let exact = self.pack.exercise(exercise_id).is_some_and(|ex| {
+            let c = Combo::parse(combo).ok();
+            self.pack
+                .node(ex)
+                .is_some_and(|(_, n)| c.is_some_and(|c| n.combo_index(&c).is_some()))
+        });
+        if exact {
+            ReviewMatch::Exact
+        } else if self
+            .pack
+            .manifest
+            .exercises
+            .iter()
+            .any(|e| e.theme == theme)
+        {
+            ReviewMatch::Theme
+        } else {
+            ReviewMatch::None
+        }
     }
 
     pub fn review_due_count(&self) -> R<i64> {
@@ -571,8 +615,20 @@ impl Trainer {
         let mut review_id = None;
         let mut review_note = None;
         let (ex, combo) = if mode == Mode::Review {
-            let Some((rid, ex_id, combo_s, theme)) = self.due_review()? else {
+            let Some(DueReview {
+                id: rid,
+                exercise_id: ex_id,
+                combo: combo_s,
+                theme,
+                from_hand,
+            }) = self.due_review()?
+            else {
                 return Ok(None);
+            };
+            let origin = if from_hand {
+                "Revisão de erro em mão completa"
+            } else {
+                "Revisão"
             };
             review_id = Some(rid);
             let same = self.pack.exercise(&ex_id).cloned().and_then(|ex| {
@@ -582,7 +638,7 @@ impl Trainer {
             });
             match same {
                 Some(v) => {
-                    review_note = Some("Revisão: mesma situação e mesma mão".to_string());
+                    review_note = Some(format!("{origin}: mesma situação e mesma mão"));
                     v
                 }
                 None => {
@@ -610,7 +666,7 @@ impl Trainer {
                     let c = self
                         .sample_combo(&node, Mode::Representative)
                         .ok_or_else(|| TrainerError::Msg("sem combos".into()))?;
-                    review_note = Some("Revisão: mesmo tema, outra mão".to_string());
+                    review_note = Some(format!("{origin}: mesmo tema, outra mão"));
                     (ex, c)
                 }
             }

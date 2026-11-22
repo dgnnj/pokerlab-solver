@@ -10,7 +10,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
-use poker_core::eval::{Feedback, Tolerance};
+use poker_core::eval::{Feedback, Grade, Tolerance};
 use poker_core::sampling::Rng;
 use poker_core::solution::SolveInfo;
 use poker_core::spot::SpotConfig;
@@ -78,7 +78,24 @@ pub enum EngineStatus {
 struct ActiveHand {
     sim: HandSim,
     started_at: String,
+    /// Review queue outcome of each decision (aligned with `sim.decisions`).
+    review: Vec<Option<ReviewMatch>>,
 }
+
+/// How the pack can review a decision graded as an inaccuracy or a mistake.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReviewMatch {
+    /// The same node is a pack exercise: same situation, same hand.
+    Exact,
+    /// No such exercise, but the pack has exercises of the same theme.
+    Theme,
+    /// Nothing equivalent in the pack: not queued.
+    None,
+}
+
+/// Tells, for (exercise id, hero combo, theme), how the pack can review that decision.
+pub type ReviewLookup<'a> = &'a dyn Fn(&str, &str, &str) -> ReviewMatch;
 
 pub struct Ready {
     src: BoardSource,
@@ -307,19 +324,29 @@ impl HandEngine {
                     spot.board,
                 ],
             )?;
-            r.hands.insert(token.clone(), ActiveHand { sim, started_at });
+            r.hands.insert(
+                token.clone(),
+                ActiveHand {
+                    sim,
+                    started_at,
+                    review: Vec::new(),
+                },
+            );
             // Same path as `act`, in case the hand ended before the hero's first decision.
             finalize_if_done(db, r, &token)?;
             snapshot(db, r, &token)
         })
     }
 
+    /// Plays the hero's `action`. A decision graded as an inaccuracy or a mistake joins the
+    /// spaced review when `lookup` finds something equivalent in the pack.
     pub fn act(
         &self,
         db: &Db,
         token: &str,
         action: usize,
         decision_ms: Option<i64>,
+        lookup: ReviewLookup,
     ) -> R<HandView> {
         let tol = self.tolerance;
         self.with_ready(|r| {
@@ -337,7 +364,14 @@ impl HandEngine {
                 return msg("a mão já terminou");
             }
             let d = h.sim.act(game, &src.spot, action, tol)?.clone();
-            insert_decision(db, token, &d, decision_ms.unwrap_or(0))?;
+            let ctx = DecisionContext {
+                solution_id: &src.solution_id,
+                spot: &src.spot,
+                hero_position: &position(&src.spot, h.sim.hero),
+                hero_combo: &h.sim.hero_combo.to_string(),
+            };
+            let queued = insert_decision(db, token, &d, decision_ms.unwrap_or(0), &ctx, lookup)?;
+            h.review.push(queued);
             h.sim.advance(game, &src.spot, rng, &mut engine_policy)?;
             finalize_if_done(db, r, token)?;
             snapshot(db, r, token)
@@ -377,14 +411,39 @@ fn position(spot: &SpotConfig, player: usize) -> String {
     }
 }
 
-fn insert_decision(db: &Db, token: &str, d: &Decision, ms: i64) -> R<()> {
+struct DecisionContext<'a> {
+    solution_id: &'a str,
+    spot: &'a SpotConfig,
+    hero_position: &'a str,
+    hero_combo: &'a str,
+}
+
+/// Records a decision (with its theme) and, when it was an inaccuracy or a mistake, queues it for
+/// review in the same transaction. Returns the queue outcome (`None` for a good or ungraded one).
+fn insert_decision(
+    db: &Db,
+    token: &str,
+    d: &Decision,
+    ms: i64,
+    ctx: &DecisionContext,
+    lookup: ReviewLookup,
+) -> R<Option<ReviewMatch>> {
     let fb = d.feedback.as_ref();
     let label = |i: usize| d.turn.actions.get(i).map(|a| a.label.clone());
-    db.conn.execute(
+    let theme = poker_core::theme::classify(
+        d.turn.street,
+        &d.line,
+        d.turn.to_call_chips,
+        ctx.hero_position,
+        ctx.spot,
+    )
+    .key;
+    let tx = db.conn.unchecked_transaction()?;
+    tx.execute(
         "INSERT INTO hand_decisions(hand_id, seq, created_at, node_id, street, board, pot_chips, chosen_index,
             chosen_label, best_index, best_label, best_ev_chips, chosen_ev_chips, loss_bb, loss_pct_pot, grade,
-            chosen_frequency, equity, not_evaluable, decision_ms)
-         SELECT id, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20
+            chosen_frequency, equity, not_evaluable, decision_ms, theme)
+         SELECT id, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21
          FROM hands WHERE token = ?1",
         params![
             token,
@@ -407,9 +466,27 @@ fn insert_decision(db: &Db, token: &str, d: &Decision, ms: i64) -> R<()> {
             d.equity.map(|e| e as f64),
             d.not_evaluable,
             ms,
+            theme,
         ],
     )?;
-    Ok(())
+    let decision_id = tx.last_insert_rowid();
+    let mistake = fb.is_some_and(|f| matches!(f.grade, Grade::Inaccuracy | Grade::Mistake));
+    let queued = if mistake {
+        let exercise_id = format!("{}:{}", ctx.solution_id, d.turn.node_id);
+        let m = lookup(&exercise_id, ctx.hero_combo, &theme);
+        if m != ReviewMatch::None {
+            tx.execute(
+                "INSERT INTO reviews(hand_decision_id, exercise_id, combo, theme, next_review_at, created_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?5)",
+                params![decision_id, exercise_id, ctx.hero_combo, theme, now()],
+            )?;
+        }
+        Some(m)
+    } else {
+        None
+    };
+    tx.commit()?;
+    Ok(queued)
 }
 
 fn finalize_if_done(db: &Db, r: &mut Ready, token: &str) -> R<()> {
@@ -484,6 +561,8 @@ pub struct DecisionView {
     pub equity: Option<f32>,
     pub tolerance_bb: Option<f64>,
     pub not_evaluable: Option<String>,
+    /// Review queue outcome for an inaccuracy or a mistake; `None` otherwise.
+    pub review: Option<ReviewMatch>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -510,6 +589,8 @@ pub struct HandSummary {
     pub total_loss_bb: f64,
     pub avg_loss_bb: f64,
     pub grades: BTreeMap<String, usize>,
+    /// Decisions of this hand sent to the spaced review.
+    pub review_queued: usize,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -554,7 +635,7 @@ fn action_options(t: &HeroTurn) -> Vec<ActionOption> {
         .collect()
 }
 
-fn decision_view(d: &Decision, cpb: f64) -> DecisionView {
+fn decision_view(d: &Decision, cpb: f64, review: Option<ReviewMatch>) -> DecisionView {
     let explanation = match (&d.feedback, d.equity) {
         (Some(fb), Some(eq)) => explain(&d.turn.actions, fb, eq, cpb),
         _ => Vec::new(),
@@ -575,6 +656,7 @@ fn decision_view(d: &Decision, cpb: f64) -> DecisionView {
         explanation,
         equity: d.equity,
         not_evaluable: d.not_evaluable.clone(),
+        review,
     }
 }
 
@@ -637,7 +719,8 @@ fn view(r: &mut Ready, token: &str) -> R<HandView> {
     let decisions: Vec<DecisionView> = sim
         .decisions
         .iter()
-        .map(|d| decision_view(d, cpb))
+        .enumerate()
+        .map(|(i, d)| decision_view(d, cpb, h.review.get(i).copied().flatten()))
         .collect();
     let graded: Vec<&Feedback> = sim
         .decisions
@@ -716,6 +799,11 @@ fn view(r: &mut Ready, token: &str) -> R<HandView> {
                 total / graded.len() as f64
             },
             grades,
+            review_queued: h
+                .review
+                .iter()
+                .filter(|m| matches!(m, Some(ReviewMatch::Exact | ReviewMatch::Theme)))
+                .count(),
         },
         started_at: h.started_at.clone(),
     })
@@ -889,6 +977,7 @@ const HAND_CSV_COLUMNS: &[(&str, &str)] = &[
     ("d.seq", "decision_seq"),
     ("d.created_at", "decision_at"),
     ("d.node_id", "node_id"),
+    ("d.theme", "theme"),
     ("d.street", "street"),
     ("d.board", "board"),
     ("d.pot_chips", "pot_chips"),

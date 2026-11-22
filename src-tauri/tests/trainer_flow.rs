@@ -4,6 +4,7 @@
 use std::path::PathBuf;
 
 use pokerlab_lib::db::Db;
+use pokerlab_lib::handplay::ReviewMatch;
 use pokerlab_lib::trainer::{install_pack, Mode, ProgressFilter, Trainer};
 
 fn bundled() -> PathBuf {
@@ -243,5 +244,119 @@ fn rebuilt_pack_with_same_version_replaces_installed_copy() {
     assert_eq!(
         std::fs::read(t.pack.dir.join("manifest.json")).unwrap(),
         bundled
+    );
+}
+
+/// The app classifies hand decisions with the same function the pack generator used: every
+/// exercise of the bundled pack gets its own theme back from its node.
+#[test]
+fn shared_theme_classifier_matches_pack_exercises() {
+    let dir = tempfile::tempdir().unwrap();
+    let t = open(dir.path(), 1);
+    for ex in &t.pack.manifest.exercises {
+        let (sol, node) = t.pack.node(ex).unwrap();
+        let th = poker_core::theme::classify(
+            node.street,
+            &node.line,
+            node.to_call_chips,
+            &node.position,
+            &sol.spot,
+        );
+        assert_eq!(th.key, ex.theme, "{}", ex.id);
+        assert_eq!(th.label, ex.theme_label, "{}", ex.id);
+    }
+}
+
+/// Inserts a played hand with one decision and its review item, as the hand engine does.
+fn queue_hand_mistake(t: &Trainer, exercise_id: &str, combo: &str, theme: &str) -> i64 {
+    let c = &t.db.conn;
+    c.execute(
+        "INSERT INTO hands(token, started_at, ended_at, solution_id, config_hash, same_config_as_pack, pack_id,
+            pack_version, engine_rev, solve_exploitability_pct, hero_position, villain_position, hero_combo,
+            villain_combo, flop)
+         VALUES (?1, 'x', 'y', 's', 'h', 1, 'p', '1', 'e', 0.4, 'BTN', 'BB', ?2, 'QdQc', 'Ah7c2d')",
+        [format!("h-{exercise_id}-{combo}"), combo.to_string()],
+    )
+    .unwrap();
+    let hand = c.last_insert_rowid();
+    c.execute(
+        "INSERT INTO hand_decisions(hand_id, seq, created_at, node_id, street, board, pot_chips, chosen_index,
+            chosen_label, grade, decision_ms, theme)
+         VALUES (?1, 0, 'x', 'n', 'flop', 'Ah7c2d', 500, 0, 'Passa', 'mistake', 800, ?2)",
+        rusqlite::params![hand, theme],
+    )
+    .unwrap();
+    let d = c.last_insert_rowid();
+    c.execute(
+        "INSERT INTO reviews(hand_decision_id, exercise_id, combo, theme, next_review_at, created_at)
+         VALUES (?1, ?2, ?3, ?4, '2000-01-01T00:00:00Z', '2000-01-01T00:00:00Z')",
+        rusqlite::params![d, exercise_id, combo, theme],
+    )
+    .unwrap();
+    c.last_insert_rowid()
+}
+
+#[test]
+fn hand_mistakes_are_reviewed_with_pack_exercises() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut t = open(dir.path(), 3);
+    let ex = t.pack.manifest.exercises[0].clone();
+    let combo = {
+        let (_, node) = t.pack.node(&ex).unwrap();
+        node.combos[0].clone()
+    };
+    // What the pack can offer for a decision made in a full hand.
+    assert_eq!(
+        t.review_match(&ex.id, &combo, &ex.theme),
+        ReviewMatch::Exact
+    );
+    let off_pack = format!("{}:x-x|2c|x-b999", ex.solution_id);
+    assert_eq!(
+        t.review_match(&off_pack, &combo, &ex.theme),
+        ReviewMatch::Theme
+    );
+    assert_eq!(
+        t.review_match(&off_pack, &combo, "srp_flop_oop_lead"),
+        ReviewMatch::None,
+        "o pacote não tem decisões do BB na raiz do flop"
+    );
+
+    // Exact item: same situation, same hand; a good answer schedules it for later.
+    let rid = queue_hand_mistake(&t, &ex.id, &combo, &ex.theme);
+    assert_eq!(t.review_due_count().unwrap(), 1);
+    let s = t.start_session(Mode::Review, None, 2).unwrap();
+    let p = t.next_exercise(s.id).unwrap().expect("item da mão");
+    assert_eq!(p.exercise_id, ex.id);
+    assert_eq!(format!("{}{}", p.hero_cards[0], p.hero_cards[1]), combo);
+    assert_eq!(
+        p.review_note.as_deref(),
+        Some("Revisão de erro em mão completa: mesma situação e mesma mão")
+    );
+    let best = {
+        let (_, node) = t.pack.node(&ex).unwrap();
+        (0..node.actions.len())
+            .max_by(|&a, &b| node.ev[a][0].partial_cmp(&node.ev[b][0]).unwrap())
+            .unwrap()
+    };
+    let fb = t.submit(&p.token, best, None).unwrap();
+    assert!(fb.in_review);
+    let (reps, attempt): (i64, Option<i64>) =
+        t.db.conn
+            .query_row(
+                "SELECT repetitions, attempt_id FROM reviews WHERE id = ?1",
+                [rid],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+    assert_eq!((reps, attempt), (1, None), "o item continua ligado à mão");
+    assert_eq!(t.review_due_count().unwrap(), 0);
+
+    // Off-pack node: another exercise of the same theme.
+    queue_hand_mistake(&t, &off_pack, &combo, &ex.theme);
+    let p = t.next_exercise(s.id).unwrap().expect("item por tema");
+    assert_eq!(t.pack.exercise(&p.exercise_id).unwrap().theme, ex.theme);
+    assert_eq!(
+        p.review_note.as_deref(),
+        Some("Revisão de erro em mão completa: mesmo tema, outra mão")
     );
 }

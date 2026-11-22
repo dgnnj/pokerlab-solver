@@ -106,6 +106,13 @@ function EngineCard({
   );
 }
 
+const REVIEW_NOTE: Record<string, string> = {
+  exact: "Foi para a revisão espaçada: você vai rever esta mesma situação com esta mão.",
+  theme:
+    "Foi para a revisão espaçada: este ponto da árvore não é um exercício do pacote, então a revisão traz outra situação do mesmo tema.",
+  none: "Não entrou na revisão espaçada: o pacote não tem exercícios deste tipo de decisão.",
+};
+
 function DecisionDetail({ d, compact }: { d: HandDecision; compact?: boolean }) {
   const f = d.feedback;
   if (!f) {
@@ -132,6 +139,7 @@ function DecisionDetail({ d, compact }: { d: HandDecision; compact?: boolean }) 
           <li key={i}>{t}</li>
         ))}
       </ul>
+      {d.review && <p className="small review-note">{REVIEW_NOTE[d.review]}</p>}
       {!compact && (
         <table className="ev-table">
           <thead>
@@ -250,6 +258,13 @@ function OutcomePanel({ hand }: { hand: HandView }) {
           </p>
         )}
         {o.rake_bb > 0 && <p className="small">Rake: {bb(o.rake_bb)}</p>}
+        {(hand.summary.review_queued ?? 0) > 0 && (
+          <p className="small review-queued">
+            {hand.summary.review_queued === 1
+              ? "1 decisão desta mão foi para a revisão espaçada."
+              : `${hand.summary.review_queued} decisões desta mão foram para a revisão espaçada.`}
+          </p>
+        )}
         <p className="muted small">
           O resultado é a sorte da mão; a perda de EV mede a qualidade das decisões contra a estratégia do motor. Uma mão
           ganha com erros continua com erros.
@@ -392,6 +407,7 @@ function LegacyHand({ review, villain }: { review: HandReview; villain: string[]
 }
 
 export function Hand({ nav }: { nav: Nav }) {
+  const { refresh } = nav;
   const [boards, setBoards] = useState<BoardOption[]>([]);
   const [status, setStatus] = useState<EngineStatus | null>(null);
   const [hand, setHand] = useState<HandView | null>(null);
@@ -489,13 +505,15 @@ export function Hand({ nav }: { nav: Nav }) {
         setHand(v);
         shownAt.current = performance.now();
         if (v.finished) loadHistory();
+        // A mistake joined the spaced review: update the sidebar badge now.
+        if ((v.summary.review_queued ?? 0) > (hand.summary.review_queued ?? 0)) void refresh();
       } catch (e) {
         setErr(errorText(e));
       } finally {
         setBusy(false);
       }
     },
-    [hand, busy, loadHistory],
+    [hand, busy, loadHistory, refresh],
   );
 
   const leave = useCallback(() => {
