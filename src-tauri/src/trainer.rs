@@ -154,18 +154,49 @@ impl Packs {
     }
 }
 
-fn copy_dir(src: &Path, dst: &Path) -> std::io::Result<()> {
-    std::fs::create_dir_all(dst)?;
-    for e in std::fs::read_dir(src)? {
-        let e = e?;
-        let to = dst.join(e.file_name());
-        if e.file_type()?.is_dir() {
-            copy_dir(&e.path(), &to)?;
-        } else {
-            std::fs::copy(e.path(), to)?;
+/// Copies the manifest and only the files it lists. The bundled folder can hold files of older
+/// pack versions: an NSIS update overwrites the install dir but does not delete old files.
+fn copy_pack(manifest: &PackManifest, src: &Path, dst: &Path) -> R<()> {
+    let io = |e: std::io::Error| TrainerError::Msg(format!("copiando pacote: {e}"));
+    std::fs::create_dir_all(dst).map_err(io)?;
+    std::fs::copy(src.join("manifest.json"), dst.join("manifest.json")).map_err(io)?;
+    for f in &manifest.files {
+        let to = manifest.file_path(dst, f)?;
+        if let Some(parent) = to.parent() {
+            std::fs::create_dir_all(parent).map_err(io)?;
         }
+        std::fs::copy(manifest.file_path(src, f)?, to).map_err(io)?;
     }
     Ok(())
+}
+
+/// Removes files of an installed pack that its manifest does not list (left by a copy of the
+/// whole bundled folder in 0.4.0). Best effort: a file that cannot be removed is kept.
+fn prune_unlisted(manifest: &PackManifest, dir: &Path) {
+    let keep: std::collections::HashSet<PathBuf> = std::iter::once(dir.join("manifest.json"))
+        .chain(
+            manifest
+                .files
+                .iter()
+                .filter_map(|f| manifest.file_path(dir, f).ok()),
+        )
+        .collect();
+    fn walk(d: &Path, keep: &std::collections::HashSet<PathBuf>) {
+        let Ok(entries) = std::fs::read_dir(d) else {
+            return;
+        };
+        for e in entries.flatten() {
+            let p = e.path();
+            match e.file_type() {
+                Ok(t) if t.is_dir() => walk(&p, keep),
+                Ok(t) if t.is_file() && !keep.contains(&p) => {
+                    let _ = std::fs::remove_file(&p);
+                }
+                _ => {}
+            }
+        }
+    }
+    walk(dir, &keep);
 }
 
 /// Installs (or re-validates) a bundled pack into the user's data dir, registers it in SQLite
@@ -188,14 +219,16 @@ pub fn install_pack(db: &Db, bundled: &Path, packs_root: &Path) -> R<LoadedPack>
         None
     };
     let (manifest, sols) = match valid {
-        Some(v) => v,
+        Some(v) => {
+            prune_unlisted(&v.0, &target);
+            v
+        }
         None => {
             // Validate the source before copying, copy to a staging dir, then publish atomically.
             src_manifest.verify_and_load(bundled)?;
             let staging = target.with_extension("staging");
             let _ = std::fs::remove_dir_all(&staging);
-            copy_dir(bundled, &staging)
-                .map_err(|e| TrainerError::Msg(format!("copiando pacote: {e}")))?;
+            copy_pack(&src_manifest, bundled, &staging)?;
             let _ = std::fs::remove_dir_all(&target);
             std::fs::rename(&staging, &target)
                 .map_err(|e| TrainerError::Msg(format!("publicando pacote: {e}")))?;

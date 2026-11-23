@@ -216,6 +216,52 @@ fn corrupted_installed_pack_is_restored_from_bundle() {
 }
 
 #[test]
+fn install_copies_only_manifest_files_and_prunes_leftovers() {
+    // A bundled folder after an NSIS update can still hold solutions of an older pack version.
+    let dir = tempfile::tempdir().unwrap();
+    let src = packs_root().join(pokerlab_lib::BUNDLED_PACKS[3]);
+    let bundle = dir.path().join("bundle");
+    std::fs::create_dir_all(bundle.join("solutions")).unwrap();
+    for e in walk(&src) {
+        let to = bundle.join(e.strip_prefix(&src).unwrap());
+        std::fs::create_dir_all(to.parent().unwrap()).unwrap();
+        std::fs::copy(&e, to).unwrap();
+    }
+    std::fs::write(bundle.join("solutions/stale-v0.json.gz"), b"old").unwrap();
+    std::fs::write(bundle.join("notes.txt"), b"old").unwrap();
+
+    let db = Db::open(&dir.path().join("pokerlab.sqlite3")).unwrap();
+    let root = dir.path().join("packs");
+    let p = install_pack(&db, &bundle, &root).unwrap();
+    let installed = |d: &std::path::Path| walk(d).len();
+    assert_eq!(
+        installed(&p.dir),
+        p.manifest.files.len() + 1,
+        "only manifest + listed files"
+    );
+    assert!(!p.dir.join("solutions/stale-v0.json.gz").exists());
+
+    // An install made by 0.4.0 copied the leftovers too: reusing it removes them.
+    std::fs::write(p.dir.join("solutions/stale-v0.json.gz"), b"old").unwrap();
+    std::fs::write(p.dir.join("notes.txt"), b"old").unwrap();
+    let p = install_pack(&db, &bundle, &root).unwrap();
+    assert_eq!(installed(&p.dir), p.manifest.files.len() + 1);
+    assert_eq!(p.solutions.len(), p.manifest.files.len());
+}
+
+fn walk(d: &std::path::Path) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    for e in std::fs::read_dir(d).unwrap().flatten() {
+        if e.file_type().unwrap().is_dir() {
+            out.extend(walk(&e.path()));
+        } else {
+            out.push(e.path());
+        }
+    }
+    out
+}
+
+#[test]
 fn turn_and_river_drills_use_dealt_board_and_line() {
     let dir = tempfile::tempdir().unwrap();
     let mut t = open(dir.path(), 11);

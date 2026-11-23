@@ -1,5 +1,8 @@
 # Changelog
 
+## Não lançado
+- Arquivos que sobravam depois de atualizar: a atualização do instalador não apagava as soluções de versões antigas dos pacotes, e o app copiava a pasta inteira para a pasta de dados (na 0.4.0, ~16 MB a mais em cada uma, no BTN x BB). Agora o instalador limpa os pacotes incluídos antes de copiar os novos, o app copia só os arquivos listados no manifesto e remove os que sobraram de uma instalação anterior.
+
 ## 0.4.0 — 2026-11-22
 - Três spots novos, cada um com 12 flops (flop, turn e river): CO x BB pote simples, SB x BB pote simples (blind contra blind) e BB x BTN pote 3-bet (SPR ~4). Ranges são premissas de estudo, documentadas em `data/spots/`.
 - BTN x BB 1.2.0: o BB pode liderar 33% no flop (exercícios "BB no flop: liderar ou passar"; na mão completa, essas decisões agora entram na revisão). A defesa por call do BB passou a fechar com o 3-bet do pacote novo (call + 3-bet ≤ 1 em cada mão). A árvore ficou maior: resolver um flop desse spot na mão completa leva de 30 s a ~4 min e até ~6 GB.
